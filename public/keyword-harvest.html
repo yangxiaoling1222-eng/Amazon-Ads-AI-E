@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>关键词收割 - 亚马逊广告AI专家</title>
+  <style>
+    :root {
+      --primary: #FF9900;
+      --primary-dark: #e68900;
+      --bg-dark: #131921;
+      --bg-card: #1c2333;
+      --bg-input: #232f3e;
+      --text-primary: #e8eaed;
+      --text-secondary: #9aa0a6;
+      --success: #00a67e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #2d3748;
+      --harvest-color: #00c896;
+      --negate-color: #f87171;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg-dark); color:var(--text-primary); min-height:100vh; }
+    .main { margin-left:260px; padding:24px; min-height:100vh; }
+
+    /* ── Header ── */
+    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+    .header h2 { font-size:22px; font-weight:600; }
+    .header h2 span { color:var(--primary); }
+    .badge { background:var(--bg-input); color:var(--text-secondary); font-size:12px; padding:3px 10px; border-radius:20px; margin-left:8px; }
+
+    /* ── Cards ── */
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; }
+    .card-title { font-size:14px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+    .card-title .dot { width:8px; height:8px; border-radius:50%; }
+    .dot-harvest { background:var(--harvest-color); }
+    .dot-negate  { background:var(--negate-color); }
+    .dot-orange  { background:var(--primary); }
+    .dot-purple   { background:#a78bfa; }
+    .dot-red      { background:#f87171; }
+
+    /* ── Grid ── */
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .grid-6 { display:grid; grid-template-columns:repeat(6,1fr); gap:16px; }
+    @media(max-width:900px){ .grid-2{grid-template-columns:1fr;} .grid-4{grid-template-columns:1fr 1fr;} .grid-6{grid-template-columns:1fr 1fr;} }
+
+    /* ── Stat boxes ── */
+    .stat-box { background:var(--bg-input); border-radius:10px; padding:16px; text-align:center; }
+    .stat-box .val { font-size:28px; font-weight:700; }
+    .stat-box .lbl { font-size:12px; color:var(--text-secondary); margin-top:4px; }
+    .val-harvest { color:var(--harvest-color); }
+    .val-negate  { color:var(--negate-color); }
+    .val-info    { color:var(--warning); }
+    .val-total   { color:var(--primary); }
+
+    /* ── Controls ── */
+    .controls { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    .form-group { display:flex; flex-direction:column; gap:6px; }
+    .form-group label { font-size:12px; color:var(--text-secondary); }
+    input, select {
+      background:var(--bg-input); border:1px solid var(--border);
+      color:var(--text-primary); border-radius:8px; padding:8px 12px;
+      font-size:13px; outline:none;
+    }
+    input:focus, select:focus { border-color:var(--primary); }
+    .input-sm { width:140px; }
+    .input-md { width:180px; }
+
+    /* ── Buttons ── */
+    .btn { padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; }
+    .btn-primary  { background:var(--primary); color:#000; }
+    .btn-primary:hover  { background:var(--primary-dark); }
+    .btn-success  { background:var(--harvest-color); color:#fff; }
+    .btn-success:hover  { background:#00a67e; }
+    .btn-danger   { background:var(--negate-color); color:#fff; }
+    .btn-danger:hover   { background:#dc2626; }
+    .btn-ghost    { background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border); }
+    .btn-ghost:hover    { border-color:var(--primary); color:var(--primary); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .btn-sm { padding:6px 12px; font-size:12px; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { padding:10px 12px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-secondary); border-bottom:1px solid var(--border); white-space:nowrap; }
+    td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+    tr:hover td { background:rgba(255,255,255,.02); }
+    .kw-text { font-weight:600; color:var(--text-primary); }
+    .match-tag { font-size:10px; padding:2px 7px; border-radius:4px; font-weight:600; }
+    .match-AUTO   { background:rgba(255,153,0,.15); color:var(--primary); }
+    .match-EXACT  { background:rgba(0,200,150,.15); color:var(--harvest-color); }
+    .match-PHRASE { background:rgba(96,165,250,.15); color:#60a5fa; }
+    .match-BROAD  { background:rgba(167,139,250,.15); color:#a78bfa; }
+    .match-NEGATIVE_EXACT { background:rgba(248,113,113,.15); color:var(--negate-color); }
+    .acos-ok   { color:var(--harvest-color); font-weight:600; }
+    .acos-warn { color:var(--warning); font-weight:600; }
+    .acos-bad  { color:var(--negate-color); font-weight:600; }
+    .bid-suggest { color:var(--primary); font-weight:600; }
+    .asin-tag { font-family:monospace; font-size:11px; padding:2px 6px; border-radius:4px; background:rgba(167,139,250,.15); color:#a78bfa; font-weight:600; }
+    .val-asin { color:#a78bfa; }
+    .val-asin-neg { color:#f87171; }
+    .reason-tag { font-size:11px; color:var(--text-secondary); max-width:200px; }
+    .empty { padding:40px; text-align:center; color:var(--text-secondary); }
+
+    /* ── Tabs ── */
+    .tabs { display:flex; gap:4px; margin-bottom:16px; }
+    .tab { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--text-secondary); transition:all .15s; }
+    .tab.active { border-color:var(--primary); color:var(--primary); background:rgba(255,153,0,.08); }
+
+    /* ── Progress / Alert ── */
+    .alert { padding:12px 16px; border-radius:8px; font-size:13px; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+    .alert-info    { background:rgba(96,165,250,.1); border:1px solid rgba(96,165,250,.3); color:#93c5fd; }
+    .alert-success { background:rgba(0,200,150,.1); border:1px solid rgba(0,200,150,.3); color:var(--harvest-color); }
+    .alert-warning { background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); color:var(--warning); }
+    .alert-danger  { background:rgba(239,68,68,.1);  border:1px solid rgba(239,68,68,.3);  color:var(--negate-color); }
+    .spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.2); border-top-color:var(--primary); border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Action bar ── */
+    .action-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px 0 4px; }
+    .select-info { font-size:13px; color:var(--text-secondary); }
+    .select-info strong { color:var(--text-primary); }
+    .checkbox-col { width:36px; }
+    input[type="checkbox"] { width:14px; height:14px; cursor:pointer; accent-color:var(--primary); }
+
+    /* ── Confirm dialog ── */
+    .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:999; align-items:center; justify-content:center; }
+    .overlay.show { display:flex; }
+    .dialog { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:28px; max-width:480px; width:90%; }
+    .dialog h3 { font-size:17px; font-weight:700; margin-bottom:10px; }
+    .dialog p  { font-size:13px; color:var(--text-secondary); margin-bottom:20px; line-height:1.6; }
+    .dialog-footer { display:flex; gap:10px; justify-content:flex-end; }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-container"></div>
+
+  <main class="main">
+    <div class="header">
+      <div>
+        <h2>关键词收割 <span>Harvest</span></h2>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">自动广告 → 提取高转化词 → 精准收割 + 否定低效词</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="loadDemo()">📋 加载示例数据</button>
+        <button class="btn btn-primary" id="btn-analyze" onclick="runAnalyze()">🔍 分析搜索词报告</button>
+      </div>
+    </div>
+
+    <!-- 配置区 -->
+    <div class="card">
+      <div class="card-title"><span class="dot dot-orange"></span>配置</div>
+      <div class="controls">
+        <div class="form-group">
+          <label>Profile ID</label>
+          <input class="input-md" id="profileId" placeholder="广告账户 ID" value="">
+        </div>
+        <div class="form-group">
+          <label>开始日期</label>
+          <input class="input-sm" id="startDate" type="date">
+        </div>
+        <div class="form-group">
+          <label>结束日期</label>
+          <input class="input-sm" id="endDate" type="date">
+        </div>
+        <div class="form-group">
+          <label>目标 ACoS (%)</label>
+          <input class="input-sm" id="targetAcos" type="number" value="25" min="1" max="100">
+        </div>
+        <div class="form-group">
+          <label>平均客单价 ($)</label>
+          <input class="input-sm" id="avgOrderValue" type="number" value="30" min="1">
+        </div>
+        <div class="form-group">
+          <label>最少收割订单数</label>
+          <input class="input-sm" id="harvestMinOrders" type="number" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>无转化否定阈值 (点击)</label>
+          <input class="input-sm" id="negateNoConvClicks" type="number" value="15" min="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计概览 -->
+    <div class="grid-6" id="stats-area" style="display:none;margin-bottom:20px;">
+      <div class="stat-box"><div class="val val-total" id="stat-total">0</div><div class="lbl">分析词数</div></div>
+      <div class="stat-box"><div class="val val-harvest" id="stat-harvest">0</div><div class="lbl">可收割词</div></div>
+      <div class="stat-box"><div class="val val-negate"  id="stat-negate">0</div><div class="lbl">建议否定</div></div>
+      <div class="stat-box"><div class="val val-asin" id="stat-asin-harvest">0</div><div class="lbl">ASIN 定向</div></div>
+      <div class="stat-box"><div class="val val-asin-neg" id="stat-asin-negate">0</div><div class="lbl">ASIN 否定</div></div>
+      <div class="stat-box"><div class="val val-info" id="stat-info">0</div><div class="lbl">观察中</div></div>
+    </div>
+
+    <!-- 状态提示 -->
+    <div id="alert-area"></div>
+
+    <!-- 结果区 -->
+    <div id="result-area" style="display:none;">
+      <!-- Tab 切换 -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('harvest')">🟢 可收割词 <span id="tab-harvest-cnt"></span></button>
+        <button class="tab" onclick="switchTab('negate')">🔴 建议否定 <span id="tab-negate-cnt"></span></button>
+        <button class="tab" onclick="switchTab('asin-harvest')">🟣 ASIN 定向 <span id="tab-asin-harvest-cnt"></span></button>
+        <button class="tab" onclick="switchTab('asin-negate')">⛔ ASIN 否定 <span id="tab-asin-negate-cnt"></span></button>
+        <button class="tab" onclick="switchTab('info')">🟡 观察中 <span id="tab-info-cnt"></span></button>
+      </div>
+
+      <!-- 操作栏 -->
+      <div class="action-bar" id="action-bar-harvest">
+        <div class="select-info">已选 <strong id="sel-count-harvest">0</strong> 个词</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('harvest')">全选</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearSel('harvest')">清空</button>
+          <button class="btn btn-success btn-sm" id="btn-exec-harvest" onclick="confirmExec('harvest')" disabled>
+            ✅ 精准收割选中词
+          </button>
+        </div>
+      </div>
+
+      <div class="action-bar" id="action-bar-negate" style="display:none;">
+        <div class="select-info">已选 <strong id="sel-count-negate">0</strong> 个词</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('negate')">全选</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearSel('negate')">清空</button>
+          <button class="btn btn-danger btn-sm" id="btn-exec-negate" onclick="confirmExec('negate')" disabled>
+            🚫 否定选中词
+          </button>
+        </div>
+      </div>
+
+      <div class="action-bar" id="action-bar-asin-harvest" style="display:none;">
+        <div class="select-info" style="color:#a78bfa;">📦 竞品 ASIN 定向 — 效果好的添加投放，出现在竞品详情页下方</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('asin-harvest')">全选</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearSel('asin-harvest')">清空</button>
+          <button class="btn btn-sm" id="btn-exec-asin-harvest" onclick="confirmExec('asin-harvest')" disabled
+            style="background:#7c3aed;color:#fff;">
+            🟣 ASIN 定向投放选中
+          </button>
+        </div>
+      </div>
+
+      <div class="action-bar" id="action-bar-asin-negate" style="display:none;">
+        <div class="select-info" style="color:#f87171;">⛔ ASIN 否定定向 — 效果差的竞品 ASIN 否定掉，避免浪费广告费</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('asin-negate')">全选</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearSel('asin-negate')">清空</button>
+          <button class="btn btn-danger btn-sm" id="btn-exec-asin-negate" onclick="confirmExec('asin-negate')" disabled>
+            ⛔ ASIN 否定投放选中
+          </button>
+        </div>
+      </div>
+
+      <div class="action-bar" id="action-bar-info" style="display:none;">
+        <div class="select-info" style="color:var(--warning);">⚠️ 观察中的词数据不足，继续积累后再决策</div>
+      </div>
+
+      <!-- 表格 -->
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 确认对话框 -->
+<div class="overlay" id="confirm-overlay">
+  <div class="dialog">
+    <h3 id="dlg-title">确认操作</h3>
+    <p id="dlg-body"></p>
+    <div class="dialog-footer">
+      <button class="btn btn-ghost" onclick="closeDialog()">取消</button>
+      <button class="btn btn-primary" id="dlg-confirm-btn" onclick="executeAction()">确认执行</button>
+    </div>
+  </div>
+</div>
+
+<script src="/components/sidebar.js"></script>
+<script>
+const API = 'http://localhost:3000/api';
+let analysisData  = { harvest:[], negate:[], info:[], asinHarvest:[], asinNegate:[] };
+let currentTab    = 'harvest';
+let pendingAction = null;
+
+// ── 日期默认值 ──────────────────────────────────────────────────
+const today = new Date();
+const fmt = d => d.toISOString().slice(0,10);
+document.getElementById('endDate').value   = fmt(new Date(today - 86400000));
+document.getElementById('startDate').value = fmt(new Date(today - 30*86400000));
+
+// ── 分析 ────────────────────────────────────────────────────────
+async function runAnalyze() {
+  const profileId = document.getElementById('profileId').value.trim();
+  if (!profileId) { showAlert('请填写 Profile ID', 'warning'); return; }
+
+  setLoading(true, '正在拉取搜索词报告，请稍候（约 1-3 分钟）…');
+
+  try {
+    const startDate         = document.getElementById('startDate').value;
+    const endDate           = document.getElementById('endDate').value;
+    const targetAcos        = +document.getElementById('targetAcos').value;
+    const avgOrderValue     = +document.getElementById('avgOrderValue').value;
+    const harvestMinOrders  = +document.getElementById('harvestMinOrders').value;
+    const negateNoConvClicks= +document.getElementById('negateNoConvClicks').value;
+
+    // Step 1: 获取搜索词报告
+    const qp = new URLSearchParams({ profileId, startDate, endDate });
+    const reportRes = await fetch(`${API}/amazon/search-terms?${qp}`);
+    const reportJson = await reportRes.json();
+    if (!reportJson.success) throw new Error(reportJson.message);
+
+    showAlert(`报告拉取成功，共 ${reportJson.total} 行数据，正在分析…`, 'info');
+
+    // Step 2: 分析
+    const analyzeRes = await fetch(`${API}/amazon/harvest/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        searchTerms: reportJson.data,
+        rules: { targetAcos, avgOrderValue, harvestMinOrders, negateNoConvClicks }
+      })
+    });
+    const r = await analyzeRes.json();
+    if (!r.success) throw new Error(r.message);
+
+    analysisData = r;
+    renderStats(r.summary);
+    switchTab('harvest');
+    setLoading(false);
+
+    const asinMsg = r.summary.asinHarvestCount > 0 || r.summary.asinNegateCount > 0
+      ? `，发现 ASIN ${r.summary.asinHarvestCount || 0} 个可定向、${r.summary.asinNegateCount || 0} 个需否定`
+      : '';
+    showAlert(`分析完成！可收割 ${r.summary.harvestCount} 个词，建议否定 ${r.summary.negateCount} 个词${asinMsg}`, 'success');
+  } catch(e) {
+    setLoading(false);
+    showAlert('分析失败：' + e.message, 'danger');
+  }
+}
+
+// ── Demo 数据 ────────────────────────────────────────────────────
+function loadDemo() {
+  analysisData = {
+    harvest: [
+      { searchTerm:'wireless earbuds', matchType:'AUTO', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', adGroupName:'AdGroup-01', clicks:45, orders:5, spend:28.50, sales:225, acos:12.7, cvr:11.1, suggestedBid:0.83, reason:'5 单 / ACoS 12.7% — 建议精准收割' },
+      { searchTerm:'bluetooth headphones noise cancelling', matchType:'AUTO', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', adGroupName:'AdGroup-01', clicks:32, orders:3, spend:22.10, sales:150, acos:14.7, cvr:9.4, suggestedBid:0.70, reason:'3 单 / ACoS 14.7% — 建议精准收割' },
+      { searchTerm:'running earphones waterproof', matchType:'AUTO', campaignId:'C002', adGroupId:'AG002', campaignName:'SP-Auto-02', adGroupName:'AdGroup-02', clicks:28, orders:4, spend:19.60, sales:180, acos:10.9, cvr:14.3, suggestedBid:1.07, reason:'4 单 / ACoS 10.9% — 建议精准收割' },
+      { searchTerm:'sport earbuds gym', matchType:'AUTO', campaignId:'C002', adGroupId:'AG002', campaignName:'SP-Auto-02', adGroupName:'AdGroup-02', clicks:19, orders:2, spend:15.20, sales:90, acos:16.9, cvr:10.5, suggestedBid:0.79, reason:'2 单 / ACoS 16.9% — 建议精准收割' },
+    ],
+    negate: [
+      { searchTerm:'cheap earbuds under 10', matchType:'NEGATIVE_EXACT', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', clicks:38, orders:0, spend:31.20, acos:null, reason:'38 次点击无转化 / 消耗 $31.20，建议否定' },
+      { searchTerm:'wired headphone', matchType:'NEGATIVE_EXACT', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', clicks:22, orders:1, spend:19.80, acos:247.5, reason:'ACoS 247.5% 超过阈值 80%，建议否定' },
+      { searchTerm:'kids headphone', matchType:'NEGATIVE_EXACT', campaignId:'C002', adGroupId:'AG002', campaignName:'SP-Auto-02', clicks:16, orders:0, spend:13.60, acos:null, reason:'16 次点击无转化 / 消耗 $13.60，建议否定' },
+    ],
+    asinHarvest: [
+      { asin:'B08N5WRWNW', searchTerm:'B08N5WRWNW', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', adGroupName:'AdGroup-01', clicks:38, orders:4, spend:25.40, sales:195, acos:13.0, cvr:10.5, suggestedBid:0.78, reason:'4 单 / ACoS 13% — 竞品效果优秀，建议 ASIN 定向' },
+      { asin:'B09V3KXJPB', searchTerm:'B09V3KXJPB', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', adGroupName:'AdGroup-01', clicks:29, orders:3, spend:19.80, sales:156, acos:12.7, cvr:10.3, suggestedBid:0.77, reason:'3 单 / ACoS 12.7% — 建议 ASIN 定向投放' },
+      { asin:'B085RX14QT', searchTerm:'B085RX14QT', campaignId:'C002', adGroupId:'AG002', campaignName:'SP-Auto-02', adGroupName:'AdGroup-02', clicks:22, orders:2, spend:16.50, sales:110, acos:15.0, cvr:9.1, suggestedBid:0.68, reason:'2 单 / ACoS 15% — 中等效果，建议测试 ASIN 定向' },
+    ],
+    asinNegate: [
+      { asin:'B07XJ8C8F5', searchTerm:'B07XJ8C8F5', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', clicks:42, orders:0, spend:35.20, acos:null, reason:'42 次点击无转化 / 消耗 $35.20，建议否定竞品' },
+      { asin:'B08B95XZLK', searchTerm:'B08B95XZLK', campaignId:'C001', adGroupId:'AG001', campaignName:'SP-Auto-01', clicks:28, orders:1, spend:23.60, acos:236.0, reason:'ACoS 236% 超过阈值，建议否定竞品投放' },
+    ],
+    info: [
+      { searchTerm:'earbuds for small ears', clicks:8, orders:0, spend:6.80, acos:null },
+      { searchTerm:'bluetooth earphones android', clicks:7, orders:1, spend:5.60, acos:56.0 },
+    ],
+    summary: { total:120, harvestCount:4, negateCount:3, infoCount:2, asinHarvestCount:3, asinNegateCount:2 }
+  };
+
+  renderStats(analysisData.summary);
+  switchTab('harvest');
+  showAlert('已加载示例数据（非真实账户数据）', 'info');
+}
+
+// ── 统计渲染 ─────────────────────────────────────────────────────
+function renderStats(s) {
+  document.getElementById('stats-area').style.display = 'grid';
+  document.getElementById('result-area').style.display = 'block';
+  document.getElementById('stat-total').textContent       = s.total;
+  document.getElementById('stat-harvest').textContent     = s.harvestCount;
+  document.getElementById('stat-negate').textContent      = s.negateCount;
+  document.getElementById('stat-asin-harvest').textContent = s.asinHarvestCount || 0;
+  document.getElementById('stat-asin-negate').textContent  = s.asinNegateCount || 0;
+  document.getElementById('stat-info').textContent         = s.infoCount;
+  document.getElementById('tab-harvest-cnt').textContent   = `(${s.harvestCount})`;
+  document.getElementById('tab-negate-cnt').textContent    = `(${s.negateCount})`;
+  document.getElementById('tab-asin-harvest-cnt').textContent = `(${s.asinHarvestCount || 0})`;
+  document.getElementById('tab-asin-negate-cnt').textContent  = `(${s.asinNegateCount || 0})`;
+  document.getElementById('tab-info-cnt').textContent       = `(${s.infoCount})`;
+}
+
+// ── Tab 切换 ─────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  const tabs = ['harvest','negate','asin-harvest','asin-negate','info'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === tab));
+  tabs.forEach(t => {
+    const el = document.getElementById(`action-bar-${t}`);
+    if (el) el.style.display = t === tab ? 'flex' : 'none';
+  });
+
+  if (tab === 'harvest')       renderHarvestTable();
+  else if (tab === 'negate')   renderNegateTable();
+  else if (tab === 'asin-harvest') renderAsinHarvestTable();
+  else if (tab === 'asin-negate')  renderAsinNegateTable();
+  else renderInfoTable();
+}
+
+// ── 收割表格 ─────────────────────────────────────────────────────
+function renderHarvestTable() {
+  document.getElementById('table-head').innerHTML = `
+    <tr>
+      <th class="checkbox-col"><input type="checkbox" id="chk-all-harvest" onchange="toggleAll('harvest',this.checked)"></th>
+      <th>搜索词</th><th>来源活动</th><th>点击</th><th>订单</th>
+      <th>花费($)</th><th>ACoS(%)</th><th>CVR(%)</th><th>建议出价($)</th><th>说明</th>
+    </tr>`;
+
+  const rows = analysisData.harvest.map((r,i) => `
+    <tr>
+      <td><input type="checkbox" class="chk-harvest" data-idx="${i}" onchange="updateSelCount('harvest')"></td>
+      <td><span class="kw-text">${r.searchTerm}</span><br>
+          <span class="match-tag match-${r.matchType}">${r.matchType}</span></td>
+      <td style="font-size:12px;color:var(--text-secondary)">${r.campaignName}<br>${r.adGroupName}</td>
+      <td>${r.clicks}</td>
+      <td><strong>${r.orders}</strong></td>
+      <td>$${r.spend}</td>
+      <td class="${acosClass(r.acos)}">${r.acos}%</td>
+      <td>${r.cvr}%</td>
+      <td class="bid-suggest">$${r.suggestedBid}</td>
+      <td class="reason-tag">${r.reason}</td>
+    </tr>`).join('');
+
+  document.getElementById('table-body').innerHTML = rows ||
+    '<tr><td colspan="10" class="empty">暂无可收割词</td></tr>';
+}
+
+// ── 否定表格 ─────────────────────────────────────────────────────
+function renderNegateTable() {
+  document.getElementById('table-head').innerHTML = `
+    <tr>
+      <th class="checkbox-col"><input type="checkbox" id="chk-all-negate" onchange="toggleAll('negate',this.checked)"></th>
+      <th>搜索词</th><th>来源活动</th><th>点击</th><th>订单</th>
+      <th>花费($)</th><th>ACoS(%)</th><th>否定类型</th><th>说明</th>
+    </tr>`;
+
+  const rows = analysisData.negate.map((r,i) => `
+    <tr>
+      <td><input type="checkbox" class="chk-negate" data-idx="${i}" onchange="updateSelCount('negate')"></td>
+      <td><span class="kw-text">${r.searchTerm}</span></td>
+      <td style="font-size:12px;color:var(--text-secondary)">${r.campaignName}</td>
+      <td>${r.clicks}</td>
+      <td>${r.orders}</td>
+      <td>$${r.spend}</td>
+      <td class="${acosClass(r.acos)}">${r.acos != null ? r.acos+'%' : '∞'}</td>
+      <td><span class="match-tag match-NEGATIVE_EXACT">${r.matchType}</span></td>
+      <td class="reason-tag">${r.reason}</td>
+    </tr>`).join('');
+
+  document.getElementById('table-body').innerHTML = rows ||
+    '<tr><td colspan="9" class="empty">暂无建议否定词</td></tr>';
+}
+
+// ── ASIN 定向表格 ─────────────────────────────────────────────────
+function renderAsinHarvestTable() {
+  document.getElementById('table-head').innerHTML = `
+    <tr>
+      <th class="checkbox-col"><input type="checkbox" id="chk-all-asin-harvest" onchange="toggleAll('asin-harvest',this.checked)"></th>
+      <th>ASIN</th><th>来源活动</th><th>点击</th><th>订单</th>
+      <th>花费($)</th><th>ACoS(%)</th><th>CVR(%)</th><th>建议出价($)</th><th>说明</th>
+    </tr>`;
+
+  const rows = analysisData.asinHarvest.map((r,i) => `
+    <tr>
+      <td><input type="checkbox" class="chk-asin-harvest" data-idx="${i}" onchange="updateSelCount('asin-harvest')"></td>
+      <td><span class="asin-tag">${r.asin}</span></td>
+      <td style="font-size:12px;color:var(--text-secondary)">${r.campaignName}<br>${r.adGroupName}</td>
+      <td>${r.clicks}</td>
+      <td><strong>${r.orders}</strong></td>
+      <td>$${r.spend}</td>
+      <td class="${acosClass(r.acos)}">${r.acos}%</td>
+      <td>${r.cvr}%</td>
+      <td class="bid-suggest">$${r.suggestedBid}</td>
+      <td class="reason-tag">${r.reason}</td>
+    </tr>`).join('');
+
+  document.getElementById('table-body').innerHTML = rows ||
+    '<tr><td colspan="10" class="empty" style="color:#a78bfa;">暂无可定向的 ASIN（需要自动广告中出现 ASIN 搜索词）</td></tr>';
+}
+
+// ── ASIN 否定表格 ─────────────────────────────────────────────────
+function renderAsinNegateTable() {
+  document.getElementById('table-head').innerHTML = `
+    <tr>
+      <th class="checkbox-col"><input type="checkbox" id="chk-all-asin-negate" onchange="toggleAll('asin-negate',this.checked)"></th>
+      <th>ASIN</th><th>来源活动</th><th>点击</th><th>订单</th>
+      <th>花费($)</th><th>ACoS(%)</th><th>说明</th>
+    </tr>`;
+
+  const rows = analysisData.asinNegate.map((r,i) => `
+    <tr>
+      <td><input type="checkbox" class="chk-asin-negate" data-idx="${i}" onchange="updateSelCount('asin-negate')"></td>
+      <td><span class="asin-tag">${r.asin}</span></td>
+      <td style="font-size:12px;color:var(--text-secondary)">${r.campaignName}</td>
+      <td>${r.clicks}</td>
+      <td>${r.orders}</td>
+      <td>$${r.spend}</td>
+      <td class="${acosClass(r.acos)}">${r.acos != null ? r.acos+'%' : '∞'}</td>
+      <td class="reason-tag">${r.reason}</td>
+    </tr>`).join('');
+
+  document.getElementById('table-body').innerHTML = rows ||
+    '<tr><td colspan="7" class="empty" style="color:#f87171;">暂无建议否定的 ASIN</td></tr>';
+}
+
+// ── 观察表格 ─────────────────────────────────────────────────────
+function renderInfoTable() {
+  document.getElementById('table-head').innerHTML = `
+    <tr><th>搜索词</th><th>点击</th><th>订单</th><th>花费($)</th><th>ACoS(%)</th></tr>`;
+  const rows = analysisData.info.map(r => `
+    <tr>
+      <td class="kw-text">${r.searchTerm}</td>
+      <td>${r.clicks}</td><td>${r.orders}</td>
+      <td>$${r.spend}</td>
+      <td class="${acosClass(r.acos)}">${r.acos != null ? r.acos+'%' : '—'}</td>
+    </tr>`).join('');
+  document.getElementById('table-body').innerHTML = rows ||
+    '<tr><td colspan="5" class="empty">暂无观察词</td></tr>';
+}
+
+// ── 辅助 ────────────────────────────────────────────────────────
+function acosClass(v) {
+  if (v == null) return 'acos-bad';
+  if (v <= 25) return 'acos-ok';
+  if (v <= 50) return 'acos-warn';
+  return 'acos-bad';
+}
+
+function getSelected(type) {
+  return [...document.querySelectorAll(`.chk-${type}:checked`)].map(c => +c.dataset.idx);
+}
+function updateSelCount(type) {
+  const n = getSelected(type).length;
+  document.getElementById(`sel-count-${type}`).textContent = n;
+  document.getElementById(`btn-exec-${type}`).disabled = n === 0;
+}
+function selectAll(type) {
+  document.querySelectorAll(`.chk-${type}`).forEach(c => c.checked = true);
+  const all = document.getElementById(`chk-all-${type}`);
+  if (all) all.checked = true;
+  updateSelCount(type);
+}
+function clearSel(type) {
+  document.querySelectorAll(`.chk-${type}`).forEach(c => c.checked = false);
+  const all = document.getElementById(`chk-all-${type}`);
+  if (all) all.checked = false;
+  updateSelCount(type);
+}
+function toggleAll(type, checked) {
+  document.querySelectorAll(`.chk-${type}`).forEach(c => c.checked = checked);
+  updateSelCount(type);
+}
+
+// ── 确认弹窗 ─────────────────────────────────────────────────────
+function confirmExec(type) {
+  const idxs = getSelected(type);
+  if (!idxs.length) return;
+  const items = idxs.map(i => analysisData[type][i]);
+
+  pendingAction = { type, items };
+
+  let title = '', body = '';
+  if (type === 'harvest') {
+    title = '确认精准收割';
+    body = `将把以下 <strong>${items.length}</strong> 个词以<strong>精准匹配</strong>创建为手动关键词：<br><br>
+       ${items.map(k=>`・${k.searchTerm}（建议出价 $${k.suggestedBid}）`).join('<br>')}
+       <br><br>⚠️ 操作完成后无法自动撤销，请确认`;
+  } else if (type === 'negate') {
+    title = '确认添加否定词';
+    body = `将把以下 <strong>${items.length}</strong> 个词添加为<strong>否定精准</strong>：<br><br>
+       ${items.map(k=>`・${k.searchTerm}`).join('<br>')}
+       <br><br>⚠️ 否定词添加后需手动删除，请确认`;
+  } else if (type === 'asin-harvest') {
+    title = '确认 ASIN 定向投放';
+    body = `将把以下 <strong>${items.length}</strong> 个竞品 ASIN 添加为<strong>商品定向投放</strong>：<br><br>
+       ${items.map(k=>`・ASIN <strong>${k.asin}</strong>（建议出价 $${k.suggestedBid}）`).join('<br>')}
+       <br><br>这些竞品的详情页下方将展示你的广告 ⚠️ 操作完成后无法自动撤销，请确认`;
+  } else if (type === 'asin-negate') {
+    title = '确认 ASIN 否定投放';
+    body = `将把以下 <strong>${items.length}</strong> 个竞品 ASIN 添加为<strong>否定商品投放</strong>：<br><br>
+       ${items.map(k=>`・ASIN <strong>${k.asin}</strong>`).join('<br>')}
+       <br><br>这些竞品页面将不再展示你的广告 ⚠️ 操作完成后需手动删除，请确认`;
+  }
+
+  document.getElementById('dlg-title').textContent = title;
+  document.getElementById('dlg-body').innerHTML = body;
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+function closeDialog() {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  pendingAction = null;
+}
+
+// ── 执行操作 ─────────────────────────────────────────────────────
+async function executeAction() {
+  if (!pendingAction) return;
+  closeDialog();
+
+  const profileId = document.getElementById('profileId').value.trim();
+  if (!profileId) { showAlert('请先填写 Profile ID', 'warning'); return; }
+
+  const { type, items } = pendingAction;
+
+  // ── ASIN 定向 ────────────────────────────────────────────────
+  if (type === 'asin-harvest') {
+    setLoading(true, '正在创建 ASIN 商品定向投放…');
+    try {
+      const body = {
+        profileId,
+        targetings: items.map(k => ({
+          campaignId: k.campaignId,
+          adGroupId:  k.adGroupId,
+          asin:       k.asin,
+          bid:        k.suggestedBid || 0.50
+        }))
+      };
+      const res  = await fetch(`${API}/amazon/asin-targeting`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(body)
+      });
+      const r = await res.json();
+      if (!r.success) throw new Error(r.message);
+      setLoading(false);
+      showAlert(`✅ 成功创建 ${r.created} 个 ASIN 商品定向投放！`, 'success');
+    } catch(e) {
+      setLoading(false);
+      showAlert('ASIN 定向执行失败：' + e.message, 'danger');
+    }
+    return;
+  }
+
+  // ── ASIN 否定 ────────────────────────────────────────────────
+  if (type === 'asin-negate') {
+    setLoading(true, '正在创建 ASIN 否定定向…');
+    try {
+      const body = {
+        profileId,
+        negatives: items.map(k => ({
+          campaignId: k.campaignId,
+          asin:       k.asin
+        }))
+      };
+      const res  = await fetch(`${API}/amazon/asin-targeting/negate`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(body)
+      });
+      const r = await res.json();
+      if (!r.success) throw new Error(r.message);
+      setLoading(false);
+      showAlert(`✅ 成功创建 ${r.created} 个 ASIN 否定定向！`, 'success');
+    } catch(e) {
+      setLoading(false);
+      showAlert('ASIN 否定执行失败：' + e.message, 'danger');
+    }
+    return;
+  }
+
+  // ── 关键词收割 / 否定 ────────────────────────────────────────
+  setLoading(true, type === 'harvest' ? '正在创建精准关键词…' : '正在添加否定词…');
+
+  try {
+    const body = { profileId };
+    if (type === 'harvest') {
+      body.harvest = items;
+      body.negate  = [];
+    } else {
+      body.harvest = [];
+      body.negate  = items;
+    }
+
+    const res = await fetch(`${API}/amazon/harvest/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    const r = await res.json();
+    if (!r.success) throw new Error(r.message);
+
+    setLoading(false);
+    if (type === 'harvest') {
+      showAlert(`✅ 成功创建 ${r.harvestCount} 个精准关键词！`, 'success');
+    } else {
+      showAlert(`✅ 成功添加 ${r.negateCount} 个否定词！`, 'success');
+    }
+  } catch(e) {
+    setLoading(false);
+    showAlert('执行失败：' + e.message, 'danger');
+  }
+}
+
+// ── UI 辅助 ───────────────────────────────────────────────────────
+function setLoading(on, msg='') {
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled = on;
+  btn.textContent = on ? '⏳ 处理中…' : '🔍 分析搜索词报告';
+  if (on && msg) showAlert(msg, 'info', true);
+}
+
+function showAlert(msg, type='info', hasSpinner=false) {
+  document.getElementById('alert-area').innerHTML = `
+    <div class="alert alert-${type}">
+      ${hasSpinner ? '<div class="spinner"></div>' : ''}
+      ${msg}
+    </div>`;
+}
+</script>
+</body>
+</html>

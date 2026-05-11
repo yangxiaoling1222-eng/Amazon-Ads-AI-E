@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>亚马逊广告 AI 智能专家</title>
+  <!-- Chart.js 图表库 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #667eea;
+      --primary-dark: #764ba2;
+      --bg-dark: #f5f6fa;
+      --bg-card: #ffffff;
+      --bg-input: #f3f4f6;
+      --text-primary: #1a1d26;
+      --text-secondary: #6b7280;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* 布局 */
+    .layout {
+      min-height: 100vh;
+    }
+
+    /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
+
+    /* 主内容区 - 左侧留出侧边栏宽度 */
+    .main {
+      margin-left: 260px;
+      padding: 24px;
+      overflow-y: auto;
+      min-height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .status-dot.error {
+      background: var(--danger);
+    }
+
+    .status-dot.warning {
+      background: var(--warning);
+    }
+
+    /* 卡片网格 */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+    }
+
+    .card-change {
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .card-change.up {
+      color: var(--success);
+    }
+
+    .card-change.down {
+      color: var(--danger);
+    }
+
+    /* AI 指令中心 */
+    .ai-center {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .ai-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .ai-header h3 {
+      font-size: 18px;
+    }
+
+    .ai-badge {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .ai-input-wrapper {
+      position: relative;
+    }
+
+    .ai-input {
+      width: 100%;
+      padding: 16px 20px;
+      padding-right: 60px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .ai-input:focus {
+      border-color: var(--primary);
+    }
+
+    .ai-input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .ai-submit {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      border: none;
+      border-radius: 6px;
+      color: #000;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .ai-submit:hover {
+      background: var(--primary-dark);
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .quick-action {
+      padding: 8px 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quick-action:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* AI 回复区域 */
+    .ai-response {
+      margin-top: 20px;
+      padding: 20px;
+      background: var(--bg-input);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .ai-response.show {
+      display: block;
+    }
+
+    .ai-response-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .ai-response-content {
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    /* 建议列表 */
+    .suggestions-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .suggestions-header h3 {
+      font-size: 18px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-tab {
+      padding: 6px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-tab:hover, .filter-tab.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .suggestion-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .suggestion-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: border-color 0.2s;
+    }
+
+    .suggestion-item:hover {
+      border-color: var(--primary);
+    }
+
+    .suggestion-priority {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .suggestion-priority.high {
+      background: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    .suggestion-priority.medium {
+      background: var(--warning);
+    }
+
+    .suggestion-priority.low {
+      background: var(--success);
+    }
+
+    .suggestion-content {
+      flex: 1;
+    }
+
+    .suggestion-type {
+      font-size: 12px;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .suggestion-title {
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .suggestion-reason {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .suggestion-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* 详情弹窗样式 */
+    .detail-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .detail-modal-content {
+      background: var(--bg-card);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 520px;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .detail-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-modal-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .detail-modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      padding: 0;
+      line-height: 1;
+    }
+
+    .detail-modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .detail-modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .detail-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 16px;
+    }
+
+    .detail-row.full-width {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .detail-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      min-width: 80px;
+    }
+
+    .detail-row.full-width .detail-label {
+      margin-bottom: 8px;
+    }
+
+    .detail-value {
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .type-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    .priority-badge {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .detail-reason {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    .keyword-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .keyword-tag {
+      background: var(--bg-secondary);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .detail-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    /* 自动驾驶状态 */
+    .autopilot-status {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .autopilot-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .toggle-label {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toggle-label span:first-child {
+      font-weight: 600;
+    }
+
+    .toggle-label span:last-child {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .toggle {
+      width: 50px;
+      height: 26px;
+      background: var(--bg-input);
+      border-radius: 13px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle.active {
+      background: var(--success);
+    }
+
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+
+    .toggle.active::after {
+      transform: translateX(24px);
+    }
+
+    .portfolio-targets {
+      margin-top: 16px;
+    }
+
+    .portfolio-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: var(--bg-input);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .portfolio-info h4 {
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .portfolio-info span {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .portfolio-acos {
+      text-align: right;
+    }
+
+    .portfolio-acos .current {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .portfolio-acos .target {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* 趋势图表区域 */
+    .charts-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .chart-header h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .chart-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chart-actions button {
+      padding: 4px 10px;
+      font-size: 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .chart-actions button:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .chart-actions button.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .chart-container {
+      position: relative;
+      height: 280px;
+    }
+
+    .chart-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .sidebar {
+        display: none;
+      }
+      
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <div id="sidebar"></div>
+
+    <!-- 主内容区 -->
+    <main class="main">
+      <!-- 头部 -->
+      <div class="header">
+        <h2>数据概览</h2>
+        <div class="connection-status">
+          <div class="status-dot" id="lingxingStatus" style="background: var(--text-secondary);"></div>
+          <span>领星 ERP</span>
+          <div class="status-dot" id="amazonStatus" style="background: var(--text-secondary);"></div>
+          <span>亚马逊 API</span>
+          <span id="dataSourceLabel" style="margin-left: 8px; color: var(--primary); font-weight: 500;">未配置数据源</span>
+        </div>
+      </div>
+
+      <!-- 核心指标卡片 -->
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">总花费</span>
+          </div>
+          <div class="card-value" id="totalSpend">$0.00</div>
+          <div class="card-change down" id="spendChange">
+            <span>↓</span> 较上周
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">总销售额</span>
+          </div>
+          <div class="card-value" id="totalSales">$0.00</div>
+          <div class="card-change up" id="salesChange">
+            <span>↑</span> 较上周
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">整体 ACOS</span>
+          </div>
+          <div class="card-value" id="totalAcos">0%</div>
+          <div class="card-change" id="acosStatus">目标: 15%</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">TACOS</span>
+          </div>
+          <div class="card-value" id="totalTacos">—</div>
+          <div class="card-change" id="tacosStatus" style="color: var(--text-secondary);">广告占总销售</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">广告活动</span>
+          </div>
+          <div class="card-value" id="totalCampaigns">0</div>
+          <div class="card-change" id="campaignStatus">正常运营中</div>
+        </div>
+      </div>
+
+      <!-- 趋势图表区域 -->
+      <div class="charts-section">
+        <!-- 花费与销售趋势图 -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h4>📈 花费与销售额趋势</h4>
+            <div class="chart-actions">
+              <button class="active" onclick="setSpendPeriod(7, this)">7天</button>
+              <button onclick="setSpendPeriod(14, this)">14天</button>
+              <button onclick="setSpendPeriod(30, this)">30天</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="spendSalesChart"></canvas>
+          </div>
+        </div>
+
+        <!-- ACOS 趋势图 -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h4>📊 ACOS 变化趋势</h4>
+            <div class="chart-actions">
+              <button class="active" onclick="setAcosPeriod(7, this)">7天</button>
+              <button onclick="setAcosPeriod(14, this)">14天</button>
+              <button onclick="setAcosPeriod(30, this)">30天</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="acosChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 指令中心 -->
+      <div class="ai-center">
+        <div class="ai-header">
+          <h3>AI 指令中心</h3>
+          <span class="ai-badge">Powered by GPT-4</span>
+        </div>
+        
+        <div class="ai-input-wrapper">
+          <input type="text" class="ai-input" id="aiQuery" placeholder="输入你的问题，例如：分析昨天销量最高的广告组合、找出 ACOS 异常的活动">
+          <button class="ai-submit" onclick="submitAIQuery()">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="quick-actions">
+          <button class="quick-action" onclick="quickAction('分析表现最好的广告')">分析表现最好的广告</button>
+          <button class="quick-action" onclick="quickAction('找出 ACOS 异常的活动')">找出 ACOS 异常的活动</button>
+          <button class="quick-action" onclick="quickAction('筛选需要排除的关键词')">筛选需要排除的关键词</button>
+          <button class="quick-action" onclick="quickAction('生成本周报表')">生成本周报表</button>
+        </div>
+
+        <div class="ai-response" id="aiResponse">
+          <div class="ai-response-header">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
+            <span>AI 分析结果</span>
+          </div>
+          <div class="ai-response-content" id="aiResponseContent"></div>
+        </div>
+      </div>
+
+      <!-- 自动驾驶状态 -->
+      <div class="autopilot-status">
+        <div class="autopilot-toggle">
+          <div class="toggle-label">
+            <span>广告自动驾驶</span>
+            <span>自动监控并优化 ACOS</span>
+          </div>
+          <div class="toggle" id="autopilotToggle" onclick="toggleAutopilot()"></div>
+        </div>
+        
+        <div class="portfolio-targets" id="portfolioTargets">
+          <div class="portfolio-item">
+            <div class="portfolio-info">
+              <h4>默认广告组合</h4>
+              <span>目标 ACOS: 15%</span>
+            </div>
+            <div class="portfolio-acos">
+              <div class="current">12.3%</div>
+              <div class="target">当前 ACOS</div>
+            </div>
+          </div>
+          <div class="portfolio-item">
+            <div class="portfolio-info">
+              <h4>新品推广组合</h4>
+              <span>目标 ACOS: 20%</span>
+            </div>
+            <div class="portfolio-acos">
+              <div class="current" style="color: var(--warning);">18.7%</div>
+              <div class="target">当前 ACOS</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 优化建议 -->
+      <div style="margin-top: 24px;">
+        <div class="suggestions-header">
+          <h3>优化建议</h3>
+          <div class="filter-tabs">
+            <button class="filter-tab active">全部</button>
+            <button class="filter-tab">高优先级</button>
+            <button class="filter-tab">出价调整</button>
+            <button class="filter-tab">否定词</button>
+          </div>
+        </div>
+
+        <div class="suggestion-list" id="suggestionList">
+          <div class="suggestion-item">
+            <div class="suggestion-priority high"></div>
+            <div class="suggestion-content">
+              <div class="suggestion-type">降低出价</div>
+              <div class="suggestion-title">Auto - Broad 电子产品</div>
+              <div class="suggestion-reason">ACOS 25.3% 超出目标 15%，建议降低出价 15%，预计可节省 $45/天</div>
+              <div class="suggestion-actions">
+                <button class="btn btn-primary">执行建议</button>
+                <button class="btn btn-secondary">查看详情</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="suggestion-item">
+            <div class="suggestion-priority high"></div>
+            <div class="suggestion-content">
+              <div class="suggestion-type">暂停活动</div>
+              <div class="suggestion-title">手动 - 精准匹配 测试词A</div>
+              <div class="suggestion-reason">花费 $156 无任何转化，建议立即暂停</div>
+              <div class="suggestion-actions">
+                <button class="btn btn-primary">暂停活动</button>
+                <button class="btn btn-secondary">查看详情</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="suggestion-item">
+            <div class="suggestion-priority medium"></div>
+            <div class="suggestion-content">
+              <div class="suggestion-type">添加否定词</div>
+              <div class="suggestion-title">Auto - Exact 配件类</div>
+              <div class="suggestion-reason">发现 8 个高花费低转化关键词，建议添加为否定词</div>
+              <div class="suggestion-actions">
+                <button class="btn btn-primary">添加否定词</button>
+                <button class="btn btn-secondary">查看详情</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="suggestion-item">
+            <div class="suggestion-priority low"></div>
+            <div class="suggestion-content">
+              <div class="suggestion-type">提高出价</div>
+              <div class="suggestion-title">手动 - 词组匹配 爆款产品</div>
+              <div class="suggestion-reason">ACOS 8.2% 远低于目标，有提价空间，建议提高出价 10%</div>
+              <div class="suggestion-actions">
+                <button class="btn btn-primary">执行建议</button>
+                <button class="btn btn-secondary">查看详情</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // API 基础地址
+    const API_BASE = 'http://localhost:3000/api';
+
+    // 默认使用 OpenRouter 自动选择模型（免费/可用）
+    const DEFAULT_MODEL = 'openrouter/free';
+
+    // 模型名称映射（用于显示友好的名称）
+    const MODEL_NAMES = {
+      'openrouter/free': 'OpenRouter (自动选择)',
+      'openai/gpt-4o': 'GPT-4o',
+      'openai/gpt-4o-mini': 'GPT-4o Mini',
+      'openai/gpt-4': 'GPT-4',
+      'anthropic/claude-3-5-sonnet': 'Claude 3.5 Sonnet',
+      'anthropic/claude-3-opus': 'Claude 3 Opus',
+      'google/gemini-pro-1.5': 'Gemini Pro 1.5',
+      'google/gemma-4-31b-it': 'Gemma 4 31B',
+      'meta-llama/llama-3-70b-instruct': 'Llama 3 70B',
+      'mistralai/mixtral-8x7b-instruct': 'Mixtral 8x7B',
+      'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3'
+    };
+
+    // 加载 AI 配置并更新模型名称
+    async function loadAIConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/config`);
+        const data = await res.json();
+        
+        if (data.success && data.data) {
+          // 优先使用 OpenRouter 模型配置，其次使用 OpenAI 模型
+          let modelId = data.data['openrouter-model'] || data.data['openai-model'] || DEFAULT_MODEL;
+          
+          // 获取友好的模型名称
+          const modelName = MODEL_NAMES[modelId] || modelId.split('/').pop() || 'AI';
+          
+          // 更新标签
+          const badge = document.querySelector('.ai-badge');
+          if (badge) {
+            badge.textContent = `Powered by ${modelName}`;
+          }
+        }
+      } catch (error) {
+        console.log('获取 AI 配置失败，使用默认模型');
+      }
+    }
+
+    // 提交 AI 查询
+    async function submitAIQuery() {
+      const query = document.getElementById('aiQuery').value;
+      if (!query) return;
+
+      const responseEl = document.getElementById('aiResponse');
+      const contentEl = document.getElementById('aiResponseContent');
+      
+      responseEl.classList.add('show');
+      contentEl.innerHTML = '<p style="color: var(--text-secondary);">正在分析...</p>';
+
+      try {
+        const res = await fetch(`${API_BASE}/ai/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            query,
+            model: DEFAULT_MODEL  // 使用 OpenRouter 自动选择模型
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          contentEl.innerHTML = `
+            <p><strong>意图识别:</strong> ${data.intent || 'general_query'}</p>
+            <pre style="white-space: pre-wrap; margin-top: 12px;">${data.response}</pre>
+          `;
+        } else {
+          // 提供更友好的错误提示
+          let errorMsg = data.error || '未知错误';
+          let solution = '';
+          
+          if (errorMsg.includes('not available in your region') || errorMsg.includes('region')) {
+            solution = `<br><br>💡 <strong>解决方案：</strong>模型在当前地区不可用。请确保使用 OpenRouter 格式的模型。`;
+          } else if (errorMsg.includes('API Key') || errorMsg.includes('api key')) {
+            solution = `<br><br>💡 <strong>解决方案：</strong>请在「系统设置」页面配置 OpenRouter API Key。`;
+          }
+          
+          contentEl.innerHTML = `<p style="color: var(--danger);">错误: ${errorMsg}${solution}</p>`;
+        }
+      } catch (error) {
+        contentEl.innerHTML = `<p style="color: var(--danger);">请求失败: ${error.message}</p>`;
+      }
+    }
+
+    // 快捷操作
+    function quickAction(action) {
+      document.getElementById('aiQuery').value = action;
+      submitAIQuery();
+    }
+
+    // 切换自动驾驶
+    function toggleAutopilot() {
+      const toggle = document.getElementById('autopilotToggle');
+      toggle.classList.toggle('active');
+      
+      const action = toggle.classList.contains('active') ? 'start' : 'stop';
+      
+      fetch(`${API_BASE}/automation/scheduler`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+    }
+
+    // ========== 趋势图表 ==========
+    let spendSalesChart = null;
+    let acosChart = null;
+    let spendPeriod = 7;
+    let acosPeriod = 7;
+
+    // 生成模拟趋势数据
+    function generateMockTrendData(days) {
+      const labels = [];
+      const spendData = [];
+      const salesData = [];
+      const acosData = [];
+      
+      const today = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        labels.push(`${date.getMonth() + 1}/${date.getDate()}`);
+        
+        // 生成模拟数据（带有一定波动）
+        const baseSpend = 800 + Math.random() * 400;
+        const baseSales = baseSpend * (3 + Math.random() * 2);
+        spendData.push(parseFloat(baseSpend.toFixed(2)));
+        salesData.push(parseFloat(baseSales.toFixed(2)));
+        acosData.push(parseFloat((baseSpend / baseSales * 100).toFixed(1)));
+      }
+      
+      return { labels, spendData, salesData, acosData };
+    }
+
+    // 初始化花费与销售趋势图
+    function initSpendSalesChart(data) {
+      const ctx = document.getElementById('spendSalesChart').getContext('2d');
+      
+      if (spendSalesChart) {
+        spendSalesChart.destroy();
+      }
+      
+      spendSalesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              label: '花费 ($)',
+              data: data.spendData,
+              borderColor: '#667eea',
+              backgroundColor: 'rgba(102, 126, 234, 0.1)',
+              fill: true,
+              tension: 0.4,
+              yAxisID: 'y'
+            },
+            {
+              label: '销售额 ($)',
+              data: data.salesData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              fill: true,
+              tension: 0.4,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                padding: 20
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: $${context.raw.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: '花费 ($)'
+              },
+              grid: {
+                color: 'rgba(0,0,0,0.05)'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: '销售额 ($)'
+              },
+              grid: {
+                drawOnChartArea: false
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 初始化 ACOS 趋势图
+    function initAcosChart(data) {
+      const ctx = document.getElementById('acosChart').getContext('2d');
+      
+      if (acosChart) {
+        acosChart.destroy();
+      }
+      
+      // 动态计算目标 ACOS 线
+      const targetAcos = 15;
+      
+      acosChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              label: 'ACOS (%)',
+              data: data.acosData,
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: `目标 ACOS (${targetAcos}%)`,
+              data: Array(data.labels.length).fill(targetAcos),
+              borderColor: '#ef4444',
+              borderDash: [5, 5],
+              borderWidth: 2,
+              fill: false,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                padding: 20
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  if (context.datasetIndex === 0) {
+                    const value = context.raw;
+                    let status = '';
+                    if (value > targetAcos + 5) status = ' ⚠️ 过高';
+                    else if (value < targetAcos - 5) status = ' ✓ 偏低';
+                    return `ACOS: ${value}%${status}`;
+                  }
+                  return `${context.dataset.label}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            },
+            y: {
+              min: 0,
+              max: 50,
+              grid: {
+                color: 'rgba(0,0,0,0.05)'
+              },
+              ticks: {
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 设置花费趋势时间周期
+    function setSpendPeriod(days, btn) {
+      spendPeriod = days;
+      
+      // 更新按钮状态
+      btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // 重新加载数据
+      const data = generateMockTrendData(days);
+      initSpendSalesChart(data);
+    }
+
+    // 设置 ACOS 趋势时间周期
+    function setAcosPeriod(days, btn) {
+      acosPeriod = days;
+      
+      // 更新按钮状态
+      btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // 重新加载数据
+      const data = generateMockTrendData(days);
+      initAcosChart(data);
+    }
+
+    // 加载图表数据
+    async function loadChartData() {
+      try {
+        // 尝试从后端获取趋势数据
+        const res = await fetch(`${API_BASE}/lingxing/trend?days=${spendPeriod}`);
+        
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data) {
+            initSpendSalesChart(result.data);
+            initAcosChart(result.data);
+            return;
+          }
+        }
+      } catch (e) {
+        console.log('使用模拟趋势数据');
+      }
+      
+      // 使用模拟数据
+      const spendData = generateMockTrendData(spendPeriod);
+      const acosData = generateMockTrendData(acosPeriod);
+      
+      initSpendSalesChart(spendData);
+      initAcosChart(acosData);
+    }
+
+    // ========== 加载数据 ==========
+    async function loadDashboardData() {
+      try {
+        // 测试领星连接状态
+        try {
+          const lingxingTest = await fetch(`${API_BASE}/lingxing/test`);
+          const lingxingData = await lingxingTest.json();
+          
+          if (lingxingData.success || lingxingData.mock) {
+            document.getElementById('lingxingStatus').style.background = 'var(--success)';
+            document.getElementById('amazonStatus').style.background = 'var(--text-secondary)';
+            document.getElementById('dataSourceLabel').textContent = '✓ 领星 ERP (Mock模式)';
+            document.getElementById('dataSourceLabel').style.color = 'var(--success)';
+          }
+        } catch (e) {
+          document.getElementById('lingxingStatus').style.background = 'var(--warning)';
+          document.getElementById('dataSourceLabel').textContent = '领星未连接';
+        }
+
+        // 获取报告数据 - 从领星同步数据
+        try {
+          const overviewRes = await fetch(`${API_BASE}/lingxing/overview`);
+          const overviewData = await overviewRes.json();
+          
+          if (overviewData.success && overviewData.data) {
+            const data = overviewData.data;
+            document.getElementById('totalSpend').textContent = `$${(data.cost || 0).toFixed(2)}`;
+            document.getElementById('totalSales').textContent = `$${(data.sales || 0).toFixed(2)}`;
+            document.getElementById('totalAcos').textContent = `${data.acos || 0}%`;
+            document.getElementById('totalCampaigns').textContent = data.campaigns || 0;
+
+            // TACOS 计算（如果有自然销售数据）
+            const adSpend = data.cost || 0;
+            const adSales = data.sales || 0;
+            const naturalSales = data.naturalSales || 0;
+            const totalSalesAll = adSales + naturalSales;
+            if (totalSalesAll > 0) {
+              const tacos = (adSpend / totalSalesAll) * 100;
+              document.getElementById('totalTacos').textContent = `${tacos.toFixed(2)}%`;
+              const verdict = tacos <= 5 ? '极优秀' : tacos <= 10 ? '优秀' : tacos <= 20 ? '良好' : tacos <= 30 ? '需优化' : '严重超标';
+              const color = tacos <= 5 ? 'var(--success)' : tacos <= 20 ? 'var(--warning)' : 'var(--danger)';
+              document.getElementById('tacosStatus').textContent = verdict;
+              document.getElementById('tacosStatus').style.color = color;
+            }
+          }
+        } catch (e) {
+          console.log('领星数据获取失败，使用默认值');
+        }
+
+        // 获取建议
+        const suggestionsRes = await fetch(`${API_BASE}/suggestions?days=30`);
+        if (suggestionsRes.ok) {
+          const suggestionsData = await suggestionsRes.json();
+          if (suggestionsData.success && suggestionsData.data) {
+            renderSuggestions(suggestionsData.data);
+          }
+        }
+
+        // 获取自动驾驶状态
+        const autoRes = await fetch(`${API_BASE}/automation/status`);
+        const autoData = await autoRes.json();
+        
+        if (autoData.data?.schedulerActive) {
+          document.getElementById('autopilotToggle').classList.add('active');
+        }
+      } catch (error) {
+        console.error('加载数据失败:', error);
+      }
+    }
+
+    // 渲染优化建议
+    function renderSuggestions(suggestions) {
+      // 保存到全局变量供详情功能使用
+      window._currentSuggestions = suggestions;
+      
+      const container = document.getElementById('suggestionList');
+      
+      if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '<div class="no-data">暂无优化建议</div>';
+        return;
+      }
+      
+      const typeLabels = {
+        'BID_DECREASE': '降低出价',
+        'BID_INCREASE': '提高出价',
+        'PAUSE_CAMPAIGN': '暂停活动',
+        'ADD_NEGATIVE': '添加否定词',
+        'BUDGET_INCREASE': '增加预算',
+        'BUDGET_DECREASE': '降低预算'
+      };
+      
+      const priorityClass = {
+        'high': 'high',
+        'medium': 'medium',
+        'low': 'low'
+      };
+      
+      container.innerHTML = suggestions.slice(0, 6).map(s => `
+        <div class="suggestion-item" data-id="${s.id || s.campaignId || ''}">
+          <div class="suggestion-priority ${priorityClass[s.priority] || 'medium'}"></div>
+          <div class="suggestion-content">
+            <div class="suggestion-type">${typeLabels[s.type] || s.type}</div>
+            <div class="suggestion-title">${s.campaignName || s.title || '未知活动'}</div>
+            <div class="suggestion-reason">${s.reason || s.description || ''}</div>
+            <div class="suggestion-actions">
+              <button class="btn btn-primary" onclick="executeSuggestion('${s.type}', '${s.id || s.campaignId || ''}')">
+                ${s.type === 'PAUSE_CAMPAIGN' ? '暂停活动' : s.type === 'ADD_NEGATIVE' ? '添加否定词' : '执行建议'}
+              </button>
+              <button class="btn btn-secondary" onclick="viewSuggestionDetail('${s.id || s.campaignId || ''}')">查看详情</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // 执行优化建议
+    async function executeSuggestion(type, id) {
+      if (!confirm('确定要执行此建议吗？')) return;
+      
+      try {
+        let endpoint = '';
+        let method = 'POST';
+        let body = {};
+        
+        switch (type) {
+          case 'BID_DECREASE':
+          case 'BID_INCREASE':
+            endpoint = `${API_BASE}/automation/bid-adjust`;
+            body = { campaignId: id, adjustment: type === 'BID_DECREASE' ? -0.15 : 0.10 };
+            break;
+          case 'PAUSE_CAMPAIGN':
+            endpoint = `${API_BASE}/automation/campaign-control`;
+            body = { campaignId: id, action: 'pause' };
+            break;
+          case 'ADD_NEGATIVE':
+            endpoint = `${API_BASE}/automation/add-negative`;
+            body = { campaignId: id };
+            break;
+          default:
+            showToast('未知操作类型', 'error');
+            return;
+        }
+        
+        const response = await fetch(endpoint, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('建议已执行', 'success');
+          loadDashboardData(); // 刷新数据
+        } else {
+          showToast(result.message || '执行失败', 'error');
+        }
+      } catch (error) {
+        console.error('执行建议失败:', error);
+        showToast('执行失败，请稍后重试', 'error');
+      }
+    }
+    
+    // 查看建议详情
+    function viewSuggestionDetail(id) {
+      const suggestions = window._currentSuggestions || [];
+      const suggestion = suggestions.find(s => s.id === id);
+      
+      if (!suggestion) {
+        showToast('未找到该建议详情', 'error');
+        return;
+      }
+      
+      // 类型标签映射
+      const typeLabels = {
+        'BID_DECREASE': '降低出价',
+        'BID_INCREASE': '提高出价',
+        'PAUSE_CAMPAIGN': '暂停活动',
+        'RESUME_CAMPAIGN': '恢复活动',
+        'ADD_NEGATIVE': '添加否定词',
+        'BUDGET_INCREASE': '增加预算',
+        'BUDGET_DECREASE': '减少预算'
+      };
+      
+      // 优先级颜色
+      const priorityColors = {
+        'high': '#ef4444',
+        'medium': '#f59e0b',
+        'low': '#22c55e'
+      };
+      
+      const priorityLabels = {
+        'high': '高',
+        'medium': '中',
+        'low': '低'
+      };
+      
+      // 创建弹窗
+      const modal = document.createElement('div');
+      modal.className = 'detail-modal';
+      modal.innerHTML = `
+        <div class="detail-modal-content">
+          <div class="detail-modal-header">
+            <h3>建议详情</h3>
+            <button class="detail-modal-close" onclick="this.closest('.detail-modal').remove()">&times;</button>
+          </div>
+          <div class="detail-modal-body">
+            <div class="detail-row">
+              <span class="detail-label">建议ID</span>
+              <span class="detail-value">${suggestion.id}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">建议类型</span>
+              <span class="detail-value type-badge" style="background: ${suggestion.type === 'PAUSE_CAMPAIGN' ? '#ef4444' : suggestion.type === 'BID_DECREASE' ? '#3b82f6' : '#22c55e'}">
+                ${typeLabels[suggestion.type] || suggestion.type}
+              </span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">优先级</span>
+              <span class="detail-value priority-badge" style="color: ${priorityColors[suggestion.priority]}">
+                ${priorityLabels[suggestion.priority] || suggestion.priority}
+              </span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">活动ID</span>
+              <span class="detail-value">${suggestion.campaignId || '-'}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">活动名称</span>
+              <span class="detail-value">${suggestion.campaignName || '-'}</span>
+            </div>
+            <div class="detail-row full-width">
+              <span class="detail-label">建议原因</span>
+              <p class="detail-reason">${suggestion.reason || '暂无详细说明'}</p>
+            </div>
+            ${suggestion.currentBid ? `
+            <div class="detail-row">
+              <span class="detail-label">当前出价</span>
+              <span class="detail-value">$${suggestion.currentBid}</span>
+            </div>
+            ` : ''}
+            ${suggestion.suggestedBid ? `
+            <div class="detail-row">
+              <span class="detail-label">建议出价</span>
+              <span class="detail-value">$${suggestion.suggestedBid}</span>
+            </div>
+            ` : ''}
+            ${suggestion.keywords ? `
+            <div class="detail-row full-width">
+              <span class="detail-label">关键词列表</span>
+              <div class="keyword-list">
+                ${suggestion.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join('')}
+              </div>
+            </div>
+            ` : ''}
+          </div>
+          <div class="detail-modal-footer">
+            <button class="btn btn-secondary" onclick="this.closest('.detail-modal').remove()">关闭</button>
+            <button class="btn btn-primary" onclick="executeSuggestion('${suggestion.type}', '${suggestion.id}'); this.closest('.detail-modal').remove();">执行建议</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // 点击背景关闭
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+      });
+    }
+    
+    // 显示提示
+    function showToast(message, type = 'info') {
+      const existing = document.querySelector('.toast');
+      if (existing) existing.remove();
+      
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // 回车提交
+    document.getElementById('aiQuery').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        submitAIQuery();
+      }
+    });
+
+    // 初始化
+    loadDashboardData();
+    loadAIConfig(); // 加载 AI 配置并更新模型名称
+    loadChartData(); // 加载趋势图表
+  </script>
+  <script src="components/sidebar.js"></script>
+</body>
+</html>

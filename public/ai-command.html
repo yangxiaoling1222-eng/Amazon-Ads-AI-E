@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI指令中心 - 亚马逊广告AI专家</title>
+  <link rel="stylesheet" href="components/task-list.css">
+  <style>
+    :root {
+      --primary: #667eea;
+      --primary-dark: #764ba2;
+      --bg-dark: #f5f6fa;
+      --bg-card: #ffffff;
+      --bg-input: #f3f4f6;
+      --text-primary: #1a1d26;
+      --text-secondary: #6b7280;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    .layout { min-height: 100vh; }
+
+    /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
+
+    /* 主内容区 - 左侧留出侧边栏宽度 */
+    .main {
+      margin-left: 260px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 100vh;
+      height: 100vh;
+    }
+
+    .header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    /* 固定顶部区域 */
+    .fixed-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg-dark);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header h2 {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    /* 聊天容器 */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0 24px 24px 24px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    /* 快捷指令 */
+    .quick-commands {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+      padding: 0 0 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .quick-cmd {
+      padding: 8px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .quick-cmd:hover {
+      background: var(--bg-input);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .quick-cmd svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* 消息列表 */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 10px;
+      margin-bottom: 20px;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .message.ai .message-avatar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .message.user .message-avatar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .message-content {
+      max-width: 75%;
+    }
+
+    .message.user .message-content {
+      text-align: right;
+    }
+
+    .message-text {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+
+    .message.user .message-text {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .message-time {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    /* 消息中的代码块 */
+    .message-text pre {
+      background: var(--bg-input);
+      padding: 12px;
+      border-radius: 8px;
+      margin: 10px 0;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+
+    .message-text code {
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+
+    /* 消息中的表格 */
+    .message-text table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+
+    .message-text th,
+    .message-text td {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .message-text th {
+      background: var(--bg-input);
+    }
+
+    /* 输入区域 */
+    .input-area {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      align-items: flex-start;
+      flex-shrink: 0;
+      margin-top: auto;
+    }
+
+    /* 模型信息 */
+    .model-selector {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 14px;
+      resize: none;
+      min-height: 44px;
+      max-height: 120px;
+      padding: 10px 0;
+    }
+
+    .input-field::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .input-field:focus {
+      outline: none;
+    }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .send-btn:hover {
+      opacity: 0.9;
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .send-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* 上传按钮 */
+    .upload-btn {
+      width: 44px;
+      height: 44px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      color: #6b7280;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .upload-btn:hover {
+      background: #e5e7eb;
+      color: #4b5563;
+    }
+
+    .upload-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* 已上传文件列表 */
+    .uploaded-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .uploaded-file {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #0369a1;
+    }
+
+    .uploaded-file .file-icon {
+      font-size: 14px;
+    }
+
+    .uploaded-file .remove-file {
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    .uploaded-file .remove-file:hover {
+      opacity: 1;
+    }
+
+    /* 工具栏按钮 */
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .toolbar-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toolbar-btn:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      color: #1e293b;
+    }
+
+    .toolbar-btn.primary {
+      background: #fff;
+      border: 1px solid #c7d2fe;
+      color: #4f46e5;
+    }
+
+    .toolbar-btn.primary:hover {
+      background: #eef2ff;
+      border-color: #a5b4fc;
+    }
+
+    .toolbar-btn.accent {
+      background: #4f46e5;
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+    }
+
+    .toolbar-btn.accent:hover {
+      background: #4338ca;
+    }
+
+    .toolbar-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .toolbar-btn .badge-count {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toolbar-btn.primary {
+      position: relative;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px;
+      min-height: 300px;
+    }
+
+    .empty-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--bg-card);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .empty-icon svg {
+      width: 40px;
+      height: 40px;
+      color: var(--primary);
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      max-width: 400px;
+    }
+
+    /* 加载动画 */
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 8px 0;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* 工具栏 */
+    .toolbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .toolbar .filter-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .toolbar .filter-group select {
+      padding: 6px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 160px;
+    }
+
+    .toolbar .filter-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .message-content { max-width: 90%; }
+      .quick-commands { gap: 8px; }
+      .quick-cmd { padding: 6px 12px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <div id="sidebar"></div>
+
+    <!-- 主内容区 -->
+    <main class="main">
+      <!-- 固定顶部区域 -->
+      <div class="fixed-header">
+        <div class="header">
+          <h2>AI指令中心</h2>
+        </div>
+
+        <!-- 历史记录面板 -->
+        <div class="history-panel" id="historyPanel" style="display: none;">
+          <div class="history-header">
+            <h4>📜 历史记录</h4>
+            <button onclick="closeHistoryPanel()" style="border: none; background: none; cursor: pointer; font-size: 18px;">×</button>
+          </div>
+          <div class="history-list" id="historyList">
+            <div class="loading">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar" style="padding: 16px 24px; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+          <div class="filter-group">
+            <label>店铺筛选：</label>
+            <select id="storeFilter" onchange="onStoreChange()">
+              <option value="">全部店铺</option>
+              <option value="store_us">美国站 - Amazon.com</option>
+              <option value="store_uk">英国站 - Amazon.co.uk</option>
+              <option value="store_de">德国站 - Amazon.de</option>
+              <option value="store_jp">日本站 - Amazon.co.jp</option>
+            </select>
+          </div>
+          <div class="toolbar-actions" style="display: flex; gap: 8px;">
+            <button class="toolbar-btn" onclick="openHistoryPanel()" title="历史记录">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+            </button>
+            <button class="toolbar-btn primary" onclick="openTaskDrawer()" title="任务列表">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/></svg>
+              任务列表
+              <span id="taskPendingBadge" class="badge-count" style="display: none;">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 快捷指令 -->
+        <div class="quick-commands">
+          <button class="quick-cmd" onclick="sendQuickCommand('分析本周广告表现')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+            分析本周广告表现
+          </button>
+          <button class="quick-cmd" onclick="sendQuickCommand('找出ACOS超标的活动')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            找出ACOS超标的活动
+          </button>
+          <button class="quick-cmd" onclick="sendQuickCommand('推荐本周新增关键词')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            推荐本周新增关键词
+          </button>
+          <button class="quick-cmd" onclick="sendQuickCommand('优化预算分配建议')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+            优化预算分配建议
+          </button>
+          <button class="quick-cmd" onclick="sendQuickCommand('生成上周广告报告')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+            生成上周广告报告
+          </button>
+        </div>
+      </div>
+
+      <!-- 滚动区域：消息列表和输入框 -->
+      <div class="chat-container">
+        <!-- 消息列表 -->
+        <div class="messages" id="messages">
+          <!-- 空状态 -->
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+              </svg>
+            </div>
+            <h3>欢迎使用 AI 指令中心</h3>
+            <p>在这里您可以用自然语言查询广告数据、分析表现、获取优化建议。尝试输入您的问题，或点击快捷指令开始。</p>
+          </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+          <div class="model-selector" id="modelInfo" style="display:none;">
+            <span id="currentModelName"></span>
+          </div>
+          <textarea
+            class="input-field"
+            id="messageInput"
+            placeholder="输入您的指令... (例如：帮我分析过去7天的广告表现)"
+            rows="1"
+            onkeydown="handleKeyDown(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+          </button>
+          <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif" style="display: none;" onchange="handleFileSelect(this.files)">
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    let messages = [];
+    let isTyping = false;
+    let currentStoreId = '';
+    let uploadedFiles = []; // 存储已上传的文件内容
+    let lastAiResponse = ''; // 用于去重，记录上一次AI回复
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+      document.getElementById('messageInput').focus();
+      // 显示当前使用的模型
+      showCurrentModel();
+      // 加载任务统计
+      taskList.loadStats();
+    });
+
+    // 显示当前使用的模型（从系统设置读取）
+    function showCurrentModel() {
+      const modelInfo = document.getElementById('modelInfo');
+      const modelName = document.getElementById('currentModelName');
+
+      try {
+        const config = JSON.parse(localStorage.getItem('apiConfig') || '{}');
+        const model = config.openrouter?.model || 'openai/gpt-4o';
+        modelName.textContent = '🤖 ' + model;
+        modelInfo.style.display = 'flex';
+      } catch (e) {
+        modelName.textContent = '🤖 openai/gpt-4o';
+        modelInfo.style.display = 'flex';
+      }
+    }
+
+    // 获取当前模型（从系统设置读取）
+    function getCurrentModel() {
+      try {
+        const config = JSON.parse(localStorage.getItem('apiConfig') || '{}');
+        return config.openrouter?.model || 'openai/gpt-4o';
+      } catch (e) {
+        return 'openai/gpt-4o';
+      }
+    }
+
+    // 店铺变更
+    function onStoreChange() {
+      currentStoreId = document.getElementById('storeFilter').value;
+      const storeName = currentStoreId ? getStoreName(currentStoreId) : '全部店铺';
+      if (messages.length > 0) {
+        addMessage('system', `已切换到 ${storeName}，当前分析基于该店铺数据`);
+      }
+    }
+
+    // 获取店铺名称
+    function getStoreName(storeId) {
+      const stores = {
+        'store_us': '美国站',
+        'store_uk': '英国站',
+        'store_de': '德国站',
+        'store_jp': '日本站'
+      };
+      return stores[storeId] || storeId;
+    }
+
+    // 快捷指令
+    function sendQuickCommand(command) {
+      document.getElementById('messageInput').value = command;
+      sendMessage();
+    }
+
+    // 处理文件选择
+    async function handleFileSelect(files) {
+      if (!files || files.length === 0) return;
+
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        const allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'gif'];
+
+        if (!allowedExts.includes(fileExt)) {
+          alert(`不支持的文件格式: .${fileExt}\n支持格式: ${allowedExts.join(', ')}`);
+          continue;
+        }
+
+        try {
+          let content = '';
+
+          if (['png', 'jpg', 'jpeg', 'gif'].includes(fileExt)) {
+            // 图片文件转换为 base64
+            content = await readFileAsBase64(file);
+            content = `[图片内容 - Base64编码，大小: ${formatFileSize(file.size)}]`;
+          } else if (['xls', 'xlsx', 'csv'].includes(fileExt)) {
+            // Excel/CSV 文件
+            content = await readExcelFile(file);
+          } else if (['doc', 'docx'].includes(fileExt)) {
+            // Word 文件 - 简化处理，只提示不支持
+            content = `[Word文档内容 - ${file.name} (${formatFileSize(file.size)})]\n注: Word文档已上传，请告诉AI直接分析此文件。`;
+          } else if (fileExt === 'pdf') {
+            // PDF 文件 - 简化处理
+            content = `[PDF文档内容 - ${file.name} (${formatFileSize(file.size)})]\n注: PDF文档已上传，请告诉AI直接分析此文件。`;
+          }
+
+          uploadedFiles.push({
+            name: file.name,
+            size: file.size,
+            type: fileExt,
+            content: content
+          });
+
+          renderUploadedFiles();
+        } catch (error) {
+          console.error('读取文件失败:', error);
+          alert(`读取文件失败: ${file.name}`);
+        }
+      }
+    }
+
+    // 读取文件为 Base64
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 读取 Excel 文件
+    function readExcelFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            // 简化的Excel解析，提取文本内容
+            let content = `[Excel文件内容 - ${file.name}]\n`;
+            content += `文件大小: ${formatFileSize(file.size)}\n\n`;
+
+            // 检查是否是CSV
+            if (file.name.endsWith('.csv')) {
+              const text = new TextDecoder().decode(data);
+              const lines = text.split('\n').slice(0, 50); // 只取前50行
+              content += '--- CSV 内容预览 ---\n';
+              content += lines.join('\n');
+              if (text.split('\n').length > 50) {
+                content += '\n...(更多行已省略)';
+              }
+              resolve(content);
+            } else {
+              // 对于xlsx，提示需要AI分析
+              content += '--- Excel数据 ---\n';
+              content += `[请AI分析此Excel文件中的数据]\n`;
+              content += `文件名: ${file.name}\n`;
+              resolve(content);
+            }
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // 格式化文件大小
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // 渲染已上传文件列表
+    function renderUploadedFiles() {
+      let container = document.getElementById('uploadedFilesContainer');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'uploadedFilesContainer';
+        container.className = 'uploaded-files';
+        const inputArea = document.querySelector('.input-area');
+        inputArea.parentNode.insertBefore(container, inputArea);
+      }
+
+      if (uploadedFiles.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'flex';
+      container.innerHTML = uploadedFiles.map((f, index) => {
+        const icons = {
+          'pdf': '📄', 'doc': '📝', 'docx': '📝',
+          'xls': '📊', 'xlsx': '📊', 'csv': '📋',
+          'png': '🖼️', 'jpg': '🖼️', 'jpeg': '🖼️', 'gif': '🖼️'
+        };
+        return `
+          <div class="uploaded-file">
+            <span class="file-icon">${icons[f.type] || '📎'}</span>
+            <span>${f.name}</span>
+            <span class="remove-file" onclick="removeUploadedFile(${index})">×</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 移除已上传的文件
+    function removeUploadedFile(index) {
+      uploadedFiles.splice(index, 1);
+      renderUploadedFiles();
+    }
+
+    // 发送消息
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      const model = getCurrentModel(); // 从系统设置获取默认模型
+
+      if (!text && uploadedFiles.length === 0 || isTyping) return;
+
+      // 如果有上传的文件，将文件内容拼接到查询中
+      let fullQuery = text;
+      if (uploadedFiles.length > 0) {
+        const fileSummary = uploadedFiles.map(f => {
+          return `[文件: ${f.name}]\n内容:\n${f.content}`;
+        }).join('\n\n');
+        fullQuery = `请分析以下文件内容：\n\n${fileSummary}\n\n${text || '请给出分析结果和建议。'}`;
+      }
+
+      // 清空输入框
+      input.value = '';
+      input.style.height = 'auto';
+
+      // 隐藏空状态
+      document.getElementById('emptyState').style.display = 'none';
+
+      // 添加用户消息
+      let displayText = text || '分析上传的文件';
+      if (uploadedFiles.length > 0) {
+        displayText += '\n\n📎 已上传文件：' + uploadedFiles.map(f => f.name).join(', ');
+      }
+      addMessage('user', displayText);
+
+      // 保存到历史记录
+      const convId = 'C' + Date.now().toString(36).toUpperCase();
+
+      // 显示加载状态
+      showTyping();
+
+      try {
+        const response = await fetch(`${API_BASE}/ai/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: fullQuery,
+            storeId: currentStoreId,
+            model: model
+          })
+        });
+
+        const data = await response.json();
+        hideTyping();
+
+        if (data.success) {
+          // 去重：检查是否是重复的响应
+          if (data.response && data.response !== lastAiResponse) {
+            lastAiResponse = data.response;
+            addMessage('ai', data.response + '\n\n---\n*模型: ' + getModelName(model) + '*');
+          }
+          // 清空上传的文件
+          uploadedFiles = [];
+          document.getElementById('fileInput').value = '';
+          renderUploadedFiles();
+          // 保存对话到历史
+          conversationHistory.saveConversation({
+            id: convId,
+            userQuery: text,
+            aiResponse: data.response,
+            model: model,
+            storeId: currentStoreId
+          });
+          
+          // 处理任务生成：检查响应中是否包含任务信息
+          if (data.taskId) {
+            console.log('AI生成了任务:', data.taskId);
+            showToast(`AI已自动生成任务，正在刷新任务列表...`, 'success');
+            // 延迟刷新任务列表，确保后端已保存
+            setTimeout(() => {
+              if (typeof taskList !== 'undefined') {
+                taskList.loadStats();
+              }
+              // 自动打开任务详情
+              setTimeout(() => {
+                if (typeof openTaskDetailModal === 'function') {
+                  openTaskDetailModal(data.taskId);
+                }
+              }, 500);
+            }, 1000);
+          }
+        } else {
+          // 提供更友好的错误提示和解决方案
+          let errorMsg = data.error || '未知错误';
+          let solution = '';
+          
+          if (errorMsg.includes('not available in your region') || errorMsg.includes('region')) {
+            solution = `
+
+---
+
+💡 **解决方案**：
+您选择的模型在当前地区不可用。请尝试以下方法：
+
+1. 在模型选择器中选择 **"OpenRouter 自动选择 (免费)"**
+2. 或者选择带有 OpenRouter 前缀的模型，如 **"openai/gpt-4o"**
+3. 如果问题持续，请在系统设置中检查 OpenRouter API Key 是否配置正确`;
+          } else if (errorMsg.includes('API Key') || errorMsg.includes('api key')) {
+            solution = `
+
+---
+
+💡 **解决方案**：
+请在「系统设置」页面中配置 OpenRouter API Key`;
+          } else if (errorMsg.includes('quota') || errorMsg.includes('credit')) {
+            solution = `
+
+---
+
+💡 **解决方案**：
+您的 OpenRouter 账户余额不足，请前往 https://openrouter.ai/credits 充值`;
+          }
+
+          addMessage('ai', `❌ 发生错误：${errorMsg}${solution}\n\n---\n*模型: ${getModelName(model)}*`);
+        }
+      } catch (error) {
+        hideTyping();
+        // 使用模拟响应（添加去重检查）
+        const mockResponse = getMockResponse(text);
+        if (mockResponse && mockResponse !== lastAiResponse) {
+          lastAiResponse = mockResponse;
+          addMessage('ai', mockResponse + '\n\n---\n*模型: ' + getModelName(model) + '*');
+        }
+      }
+    }
+
+    // 获取模型显示名称
+    function getModelName(modelId) {
+      const names = {
+        'openrouter/free': '自动选择',
+        'google/gemma-4-31b-it': 'Gemma 4 31B',
+        'openai/gpt-4o': 'GPT-4o',
+        'openai/gpt-4o-mini': 'GPT-4o Mini',
+        'anthropic/claude-3-5-sonnet': 'Claude 3.5',
+        'anthropic/claude-3-opus': 'Claude 3 Opus',
+        'google/gemini-pro-1.5': 'Gemini Pro',
+        'meta-llama/llama-3-70b-instruct': 'Llama 3 70B',
+        'mistralai/mixtral-8x7b-instruct': 'Mixtral 8x7B'
+      };
+      return names[modelId] || modelId;
+    }
+
+    // 添加消息到列表
+    function addMessage(type, text) {
+      const messagesContainer = document.getElementById('messages');
+      const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${type}`;
+      messageDiv.innerHTML = `
+        <div class="message-avatar">${type === 'ai' ? 'AI' : '我'}</div>
+        <div class="message-content">
+          <div class="message-text">${formatMessage(text)}</div>
+          <div class="message-time">${time}</div>
+        </div>
+      `;
+      
+      messagesContainer.appendChild(messageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      messages.push({ type, text, time });
+    }
+
+    // 格式化消息（支持换行和基本格式）
+    function formatMessage(text) {
+      return text
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.*?)`/g, '<code>$1</code>');
+    }
+
+    // 显示加载状态
+    function showTyping() {
+      isTyping = true;
+      document.getElementById('sendBtn').disabled = true;
+      
+      const messagesContainer = document.getElementById('messages');
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message ai';
+      typingDiv.id = 'typingIndicator';
+      typingDiv.innerHTML = `
+        <div class="message-avatar">AI</div>
+        <div class="message-content">
+          <div class="message-text">
+            <div class="typing-indicator">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      messagesContainer.appendChild(typingDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // 隐藏加载状态
+    function hideTyping() {
+      isTyping = false;
+      document.getElementById('sendBtn').disabled = false;
+      const typing = document.getElementById('typingIndicator');
+      if (typing) typing.remove();
+    }
+
+    // 处理键盘事件
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    // 自动调整输入框高度
+    function autoResize(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+
+    // 历史记录面板
+    async function openHistoryPanel() {
+      const panel = document.getElementById('historyPanel');
+      panel.style.display = 'block';
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '<div class="loading">加载中...</div>';
+      await conversationHistory.loadHistory(20);
+      conversationHistory.renderHistoryList('historyList', 'loadConversation');
+    }
+
+    function closeHistoryPanel() {
+      document.getElementById('historyPanel').style.display = 'none';
+    }
+
+    // 任务筛选
+    async function filterTasks(status, btn) {
+      // 更新按钮状态
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // 更新筛选参数
+      document.getElementById('taskStatusFilter').value = status;
+      await refreshTaskList();
+    }
+
+    // 模拟AI响应
+    function getMockResponse(query) {
+      const lowerQuery = query.toLowerCase();
+      
+      if (lowerQuery.includes('分析') || lowerQuery.includes('表现')) {
+        return `## 📊 本周广告表现分析
+
+| 指标 | 数值 | 环比 |
+|------|------|------|
+| 总花费 | ¥28,450 | +5.2% |
+| 总销售额 | ¥113,800 | +8.3% |
+| 平均ACOS | 25.0% | -2.1% |
+| 总订单 | 892 | +12.5% |
+| 平均CPC | ¥0.85 | -3.4% |
+
+**关键发现：**
+- ✅ 品牌词活动表现优异，ACOS仅18.5%
+- ⚠️ 长尾词活动ACOS达32%，需要优化
+- 💡 建议增加竞品词预算，当前ROI较高
+
+需要我进一步分析某个具体活动吗？`;
+      }
+      
+      if (lowerQuery.includes('acos') || lowerQuery.includes('超标')) {
+        return `## ⚠️ ACOS 超标活动检测
+
+发现 **3个** 活动ACOS超过目标值：
+
+| 活动名称 | 当前ACOS | 目标ACOS | 超出 |
+|----------|----------|----------|------|
+| 长尾词-精准匹配 | 32.5% | 25% | +7.5% |
+| 类目词-广泛 | 28.3% | 25% | +3.3% |
+| 竞品词-ASIN定向 | 41.2% | 30% | +11.2% |
+
+**建议操作：**
+1. 长尾词活动：降低出价10-15%
+2. 类目词活动：添加否定关键词 "free"
+3. ASIN定向：暂停表现最差的5个ASIN
+
+是否需要我自动执行这些优化？`;
+      }
+      
+      if (lowerQuery.includes('关键词') || lowerQuery.includes('推荐')) {
+        return `## 🔑 关键词推荐
+
+根据本周数据，推荐以下 **高潜力关键词**：
+
+### 新增建议
+| 关键词 | 搜索量 | 竞争度 | 建议出价 |
+|--------|--------|--------|----------|
+| wireless earbuds pro | 高 | 中 | $0.75 |
+| bluetooth headphones noise | 高 | 中高 | $0.85 |
+| earphone for running | 中 | 低 | $0.55 |
+
+### 否定关键词（建议添加）
+| 关键词 | 原因 |
+|--------|------|
+| free | 无转化 |
+| case | 产品不匹配 |
+| cover | 产品不匹配 |
+
+是否需要我自动添加这些关键词？`;
+      }
+      
+      if (lowerQuery.includes('预算') || lowerQuery.includes('分配')) {
+        return `## 💰 预算分配建议
+
+当前总预算：¥5,000/天
+
+| 活动类型 | 当前 | 建议 | 调整 |
+|----------|------|------|------|
+| 品牌词 | ¥1,500 | ¥2,000 | +500 |
+| 竞品词 | ¥2,000 | ¥2,200 | +200 |
+| 长尾词 | ¥1,000 | ¥500 | -500 |
+| 类目词 | ¥500 | ¥300 | -200 |
+
+**理由：**
+- 品牌词ACOS最低（18.5%），增加预算可提升整体利润
+- 长尾词ACOS超标（32%），建议缩减预算优化后再增加
+
+是否应用此预算分配方案？`;
+      }
+      
+      if (lowerQuery.includes('报告')) {
+        return `## 📋 广告周报
+
+**报告周期：** 2026-04-22 至 2026-04-28
+
+### 核心指标
+- 总花费：¥28,450
+- 总销售额：¥113,800
+- **ACOS：25.0%**（目标：25% ✅）
+- 总订单：892笔
+- 转化率：8.5%
+
+### TOP 3 活动
+1. 品牌词-自动（ACOS 18.5%）
+2. 竞品词-ASIN定向（ACOS 22.1%）
+3. 长尾词-精准（ACOS 24.8%）
+
+### 需要关注
+- ❌ 长尾词-广泛（ACOS 32.5%）
+- ⚠️ 新增3个低效关键词建议否词
+
+### AI执行记录
+本周共执行 **47次** 自动优化操作：
+- 调价：23次
+- 否词：12次
+- 新增关键词：8次
+- 暂停活动：4次
+
+---
+
+需要导出完整报告吗？`;
+      }
+      
+      return `我理解了您的请求：「${query}」
+
+作为您的广告AI助手，我可以帮您：
+
+📊 **数据分析**
+- 分析广告表现（按日/周/月）
+- 监控ACOS变化趋势
+- 识别高/低效活动
+
+🔧 **优化操作**
+- 自动调整出价
+- 添加否定关键词
+- 推荐新关键词
+- 优化预算分配
+
+📋 **报告生成**
+- 生成广告表现报告
+- 生成关键词报告
+- 生成竞品分析报告
+
+请告诉我您需要哪方面的帮助？`;
+    }
+  </script>
+  <script src="components/sidebar.js"></script>
+  <script src="components/task-list.js"></script>
+
+  <!-- 任务详情弹窗 -->
+  <div class="modal-overlay" id="taskDetailModal">
+    <div class="task-modal">
+      <div class="modal-header">
+        <div class="modal-title">任务详情</div>
+        <button class="modal-close" onclick="closeTaskDetailModal()">×</button>
+      </div>
+      <div class="modal-body" id="taskDetailContent">
+        <!-- 动态内容 -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeTaskDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务列表抽屉 -->
+  <div class="task-drawer" id="taskDrawer">
+    <div class="drawer-header">
+      <h3>📋 任务列表</h3>
+      <button class="drawer-close" onclick="closeTaskDrawer()">×</button>
+    </div>
+    <div class="drawer-content">
+      <input type="hidden" id="taskStatusFilter" value="all">
+      <div class="task-filters">
+        <button class="filter-btn active" onclick="filterTasks('all', this)">全部</button>
+        <button class="filter-btn" onclick="filterTasks('pending', this)">待执行</button>
+        <button class="filter-btn" onclick="filterTasks('in_progress', this)">进行中</button>
+        <button class="filter-btn" onclick="filterTasks('completed', this)">已完成</button>
+      </div>
+      <div id="taskListContent">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-primary" onclick="openAddTaskModal()" style="width: 100%;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        新建任务
+      </button>
+    </div>
+  </div>
+
+  <!-- 新建任务弹窗 -->
+  <div class="modal-overlay" id="addTaskModal">
+    <div class="task-modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title">新建任务</div>
+        <button class="modal-close" onclick="closeAddTaskModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 13px; color: #6b7280; margin-bottom: 6px;">任务名称 *</label>
+          <input type="text" id="taskNameInput" placeholder="请输入任务名称" style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 13px; color: #6b7280; margin-bottom: 6px;">任务描述</label>
+          <textarea id="taskDescInput" placeholder="请输入任务描述（可选）" rows="3" style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: none;"></textarea>
+        </div>
+        <div>
+          <label style="display: block; font-size: 13px; color: #6b7280; margin-bottom: 6px;">优先级</label>
+          <select id="taskPrioritySelect" style="width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
+            <option value="low">低</option>
+            <option value="medium" selected>中</option>
+            <option value="high">高</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAddTaskModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitNewTask()">创建任务</button>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>

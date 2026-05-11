@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务中心 - 亚马逊广告AI专家</title>
+  <link rel="stylesheet" href="components/sidebar.css">
+  <link rel="stylesheet" href="components/task-list.css">
+  <style>
+    .page-container {
+      margin-left: 260px;
+      padding: 24px;
+      min-height: 100vh;
+      background: #f5f7fa;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .page-header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a1a2e;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .stat-card .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    .stat-card .stat-label {
+      font-size: 13px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .stat-card.pending .stat-value { color: #f59e0b; }
+    .stat-card.progress .stat-value { color: #667eea; }
+    .stat-card.completed .stat-value { color: #10b981; }
+    .stat-card.cancelled .stat-value { color: #9ca3af; }
+
+    .content-area {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 24px;
+    }
+
+    .main-list {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .list-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .quick-add {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      height: fit-content;
+      position: sticky;
+      top: 24px;
+    }
+
+    .quick-add h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .submit-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 12px 20px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .submit-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .quick-add .form-group {
+      margin-bottom: 16px;
+    }
+
+    .quick-add label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .quick-add input,
+    .quick-add textarea,
+    .quick-add select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .quick-add textarea {
+      resize: none;
+      min-height: 80px;
+    }
+
+    @media (max-width: 1024px) {
+      .content-area {
+        grid-template-columns: 1fr;
+      }
+      .quick-add {
+        position: static;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .page-container {
+        margin-left: 0;
+      }
+      .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside id="sidebar"></aside>
+
+    <div class="page-container">
+      <div class="page-header">
+        <h1>📋 任务中心</h1>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-row">
+        <div class="stat-card pending">
+          <div class="stat-value" id="statPending">0</div>
+          <div class="stat-label">待执行</div>
+        </div>
+        <div class="stat-card progress">
+          <div class="stat-value" id="statInProgress">0</div>
+          <div class="stat-label">进行中</div>
+        </div>
+        <div class="stat-card completed">
+          <div class="stat-value" id="statCompleted">0</div>
+          <div class="stat-label">已完成</div>
+        </div>
+        <div class="stat-card cancelled">
+          <div class="stat-value" id="statCancelled">0</div>
+          <div class="stat-label">已取消</div>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <!-- 任务列表 -->
+        <div class="main-list">
+          <div class="list-header">
+            <h3>全部任务</h3>
+            <div class="task-filters">
+              <button class="filter-btn active" onclick="filterTasks('all', this)">全部</button>
+              <button class="filter-btn" onclick="filterTasks('pending', this)">待执行</button>
+              <button class="filter-btn" onclick="filterTasks('in_progress', this)">进行中</button>
+              <button class="filter-btn" onclick="filterTasks('completed', this)">已完成</button>
+            </div>
+          </div>
+          <input type="hidden" id="taskStatusFilter" value="all">
+          <div id="taskListContent">
+            <div class="task-empty">
+              <div class="task-empty-icon">📋</div>
+              <p>暂无任务</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 快速添加 -->
+        <div class="quick-add">
+          <h3>快速创建任务</h3>
+          <div class="form-group">
+            <label>任务名称 *</label>
+            <input type="text" id="taskNameInput" placeholder="输入任务名称">
+          </div>
+          <div class="form-group">
+            <label>任务描述</label>
+            <textarea id="taskDescInput" placeholder="输入任务描述（可选）"></textarea>
+          </div>
+          <div class="form-group">
+            <label>优先级</label>
+            <select id="taskPrioritySelect">
+              <option value="low">低</option>
+              <option value="medium" selected>中</option>
+              <option value="high">高</option>
+            </select>
+          </div>
+          <button class="submit-btn" onclick="submitNewTask()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            创建任务
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务详情弹窗 -->
+  <div class="modal-overlay" id="taskDetailModal">
+    <div class="task-modal">
+      <div class="modal-header">
+        <div class="modal-title">任务详情</div>
+        <button class="modal-close" onclick="closeTaskDetailModal()">×</button>
+      </div>
+      <div class="modal-body" id="taskDetailContent"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeTaskDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="components/sidebar.js"></script>
+  <script src="components/task-list.js"></script>
+  <script>
+    // 页面初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+      await loadStats();
+      await refreshTaskList();
+    });
+
+    // 加载统计数据
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/tasks/stats');
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('statPending').textContent = data.data.pending;
+          document.getElementById('statInProgress').textContent = data.data.in_progress;
+          document.getElementById('statCompleted').textContent = data.data.completed;
+          document.getElementById('statCancelled').textContent = data.data.cancelled;
+        }
+      } catch (error) {
+        console.error('加载统计失败:', error);
+      }
+    }
+
+    // 筛选任务
+    async function filterTasks(status, btn) {
+      document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('taskStatusFilter').value = status;
+      await refreshTaskList();
+    }
+
+    // 刷新列表后更新统计
+    var originalRefresh = refreshTaskList;
+    refreshTaskList = async function() {
+      await originalRefresh();
+      await loadStats();
+    };
+  </script>
+
+  <div id="toast-container"></div>
+</body>
+</html>

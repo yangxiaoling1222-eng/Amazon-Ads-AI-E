@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>广告组合管理 - 亚马逊广告AI专家</title>
+  <style>
+    :root {
+      --primary: #667eea;
+      --primary-dark: #764ba2;
+      --bg-dark: #f5f6fa;
+      --bg-card: #ffffff;
+      --bg-input: #f3f4f6;
+      --text-primary: #1a1d26;
+      --text-secondary: #6b7280;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    .main {
+      margin-left: 260px;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h2 {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    /* 工具栏 */
+    .toolbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .toolbar .filter-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .toolbar .filter-group select {
+      padding: 6px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 140px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    .btn-success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+    }
+
+    .btn-success:hover {
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    /* 统计卡片 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    /* 表格 */
+    .table-container {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-header h3 {
+      font-size: 16px;
+    }
+
+    .table-header .selected-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .table-header .selected-info strong {
+      color: var(--primary);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-input);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      font-size: 14px;
+    }
+
+    tr:hover td {
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    tr.selected td {
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .checkbox-cell {
+      width: 40px;
+    }
+
+    .checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .store-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--bg-input);
+    }
+
+    .store-badge.store_us { color: #2563eb; }
+    .store-badge.store_uk { color: #dc2626; }
+    .store-badge.store_de { color: #d97706; }
+    .store-badge.store_jp { color: #db2777; }
+
+    .owner-select {
+      padding: 6px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 120px;
+    }
+
+    .owner-select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .owner-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .owner-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .owner-name {
+      font-size: 13px;
+    }
+
+    .unassigned {
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      background: var(--bg-input);
+      color: var(--text-secondary);
+    }
+
+    .action-btn:hover {
+      color: var(--primary);
+    }
+
+    /* 批量操作栏 */
+    .batch-bar {
+      display: none;
+      background: var(--primary);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .batch-bar.show {
+      display: flex;
+    }
+
+    .batch-bar .info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .batch-bar .actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .batch-bar .btn-batch {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .batch-bar .btn-assign {
+      background: white;
+      color: var(--primary);
+    }
+
+    .batch-bar .btn-clear {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: 12px;
+      width: 400px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      font-size: 18px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Toast提示 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 2000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast.show { display: flex; }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--danger); }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <div id="sidebar"></div>
+
+    <!-- 主内容区 -->
+    <main class="main">
+      <div class="header">
+        <h2>广告组合管理</h2>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">广告组合总数</div>
+          <div class="stat-value" id="totalPortfolios">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">已分配组合</div>
+          <div class="stat-value success" id="assignedCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">未分配组合</div>
+          <div class="stat-value warning" id="unassignedCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">负责人员工数</div>
+          <div class="stat-value" id="ownerCount">0</div>
+        </div>
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div class="batch-bar" id="batchBar">
+        <div class="info">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          已选择 <strong id="selectedCount">0</strong> 个广告组合
+        </div>
+        <div class="actions">
+          <button class="btn-batch btn-assign" onclick="openBatchAssignModal()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            批量分配负责人
+          </button>
+          <button class="btn-batch btn-clear" onclick="clearSelection()">
+            清除选择
+          </button>
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <div class="filter-group">
+          <label>店铺筛选：</label>
+          <select id="storeFilter" onchange="loadPortfolios()">
+            <option value="">全部店铺</option>
+            <option value="store_us">美国站</option>
+            <option value="store_uk">英国站</option>
+            <option value="store_de">德国站</option>
+            <option value="store_jp">日本站</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>负责人：</label>
+          <select id="ownerFilter" onchange="loadPortfolios()">
+            <option value="">全部人员</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>分配状态：</label>
+          <select id="assignFilter" onchange="loadPortfolios()">
+            <option value="">全部</option>
+            <option value="assigned">已分配</option>
+            <option value="unassigned">未分配</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 广告组合列表 -->
+      <div class="table-container">
+        <div class="table-header">
+          <h3>广告组合列表</h3>
+          <span class="selected-info">勾选多个组合可批量分配负责人</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th class="checkbox-cell">
+                <input type="checkbox" class="checkbox" id="selectAll" onchange="toggleSelectAll()">
+              </th>
+              <th>广告组合</th>
+              <th>所属店铺</th>
+              <th>负责人</th>
+              <th>目标ACOS</th>
+              <th>当前ACOS</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="portfoliosTable">
+            <!-- 动态填充 -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- 批量分配负责人模态框 -->
+  <div class="modal-overlay" id="assignModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>批量分配负责人</h3>
+        <button class="modal-close" onclick="closeAssignModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-input); border-radius: 8px;">
+          将为 <strong id="batchCount">0</strong> 个广告组合分配负责人
+        </div>
+        <div class="form-group">
+          <label>选择负责人 *</label>
+          <select id="batchOwner" required>
+            <option value="">请选择负责人</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAssignModal()">取消</button>
+        <button class="btn btn-primary" onclick="batchAssignOwner()">确认分配</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast提示 -->
+  <div class="toast" id="toast">
+    <span id="toastMessage"></span>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/api';
+    let portfolios = [];
+    let users = [];
+    let selectedIds = new Set();
+
+    // 模拟当前登录用户
+    const currentUser = {
+      id: 'U001',
+      name: '系统管理员',
+      role: 'admin'
+    };
+
+    // 管理员权限检查
+    function checkAdminPermission() {
+      if (currentUser.role !== 'admin') {
+        document.querySelector('.main').innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
+            <svg viewBox="0 0 24 24" width="80" height="80" fill="#ef4444" style="margin-bottom: 24px;">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z"/>
+            </svg>
+            <h2 style="font-size: 24px; color: #1a1d26; margin-bottom: 12px;">无权限访问</h2>
+            <p style="color: #6b7280; font-size: 16px;">此页面仅限管理员访问，您的账号没有权限查看此页面。</p>
+            <a href="index.html" style="margin-top: 24px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-size: 14px;">返回首页</a>
+          </div>
+        `;
+        document.body.querySelector('.layout').style.display = 'none';
+        return false;
+      }
+      return true;
+    }
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!checkAdminPermission()) return;
+      loadUsers();
+      loadPortfolios();
+    });
+
+    // 加载用户列表（用于负责人下拉框）
+    async function loadUsers() {
+      try {
+        const response = await fetch(`${API_BASE}/users`);
+        const result = await response.json();
+        if (result.success) {
+          users = result.data.filter(u => u.status === 'active');
+        }
+      } catch (error) {
+        console.error('加载用户失败:', error);
+        // 使用模拟数据作为后备
+        users = [
+          { id: 'U002', name: '李华', role: 'manager' },
+          { id: 'U003', name: '王芳', role: 'manager' },
+          { id: 'U004', name: '赵伟', role: 'user' }
+        ];
+      }
+
+      // 填充负责人筛选下拉框
+      const ownerFilter = document.getElementById('ownerFilter');
+      ownerFilter.innerHTML = '<option value="">全部人员</option>';
+      users.forEach(u => {
+        ownerFilter.innerHTML += `<option value="${u.id}">${u.name}</option>`;
+      });
+
+      // 填充批量分配负责人下拉框
+      const batchOwner = document.getElementById('batchOwner');
+      batchOwner.innerHTML = '<option value="">请选择负责人</option>';
+      users.forEach(u => {
+        batchOwner.innerHTML += `<option value="${u.id}">${u.name}</option>`;
+      });
+    }
+
+    // 加载广告组合列表
+    async function loadPortfolios() {
+      const storeFilter = document.getElementById('storeFilter')?.value || '';
+      const ownerFilter = document.getElementById('ownerFilter')?.value || '';
+      const assignFilter = document.getElementById('assignFilter')?.value || '';
+
+      try {
+        const response = await fetch(`${API_BASE}/portfolios`);
+        const result = await response.json();
+        if (result.success) {
+          portfolios = result.data.map(p => ({
+            id: p.id,
+            name: p.name,
+            storeId: p.store_id,
+            storeName: p.store_name,
+            ownerId: p.owner_id,
+            ownerName: p.owner_name,
+            targetAcos: p.target_acos,
+            currentAcos: p.current_acos,
+            createdAt: p.created_at
+          }));
+        }
+      } catch (error) {
+        console.error('加载广告组合失败:', error);
+        // 使用模拟数据作为后备
+        portfolios = getMockPortfolios();
+      }
+
+      // 应用筛选
+      let filteredPortfolios = portfolios;
+      if (storeFilter) {
+        filteredPortfolios = filteredPortfolios.filter(p => p.storeId === storeFilter);
+      }
+      if (ownerFilter) {
+        filteredPortfolios = filteredPortfolios.filter(p => p.ownerId === ownerFilter);
+      }
+      if (assignFilter === 'assigned') {
+        filteredPortfolios = filteredPortfolios.filter(p => p.ownerId);
+      }
+      if (assignFilter === 'unassigned') {
+        filteredPortfolios = filteredPortfolios.filter(p => !p.ownerId);
+      }
+
+      renderPortfolios(filteredPortfolios);
+      updateStats(filteredPortfolios);
+    }
+
+    // 模拟广告组合数据（后备）
+    function getMockPortfolios() {
+      return [
+        { id: 'P001', name: '电子类产品组合', storeId: 'store_us', storeName: '美国站', ownerId: 'U002', ownerName: '李华', targetAcos: 15, currentAcos: 12.3, createdAt: '2024-01-20 10:00:00' },
+        { id: 'P002', name: '家居类产品组合', storeId: 'store_us', storeName: '美国站', ownerId: 'U002', ownerName: '李华', targetAcos: 20, currentAcos: 28.5, createdAt: '2024-02-15 14:30:00' },
+        { id: 'P003', name: '服装类产品组合', storeId: 'store_uk', storeName: '英国站', ownerId: 'U003', ownerName: '王芳', targetAcos: 18, currentAcos: 16.2, createdAt: '2024-03-01 09:15:00' },
+        { id: 'P004', name: '玩具类产品组合', storeId: 'store_de', storeName: '德国站', ownerId: null, ownerName: null, targetAcos: 22, currentAcos: 19.8, createdAt: '2024-03-10 11:00:00' },
+        { id: 'P005', name: '美妆类产品组合', storeId: 'store_jp', storeName: '日本站', ownerId: 'U003', ownerName: '王芳', targetAcos: 16, currentAcos: 24.1, createdAt: '2024-03-15 16:45:00' },
+        { id: 'P006', name: '运动户外组合', storeId: 'store_us', storeName: '美国站', ownerId: 'U004', ownerName: '赵伟', targetAcos: 18, currentAcos: 15.5, createdAt: '2024-03-20 10:30:00' },
+        { id: 'P007', name: '厨房用品组合', storeId: 'store_uk', storeName: '英国站', ownerId: null, ownerName: null, targetAcos: 20, currentAcos: 18.2, createdAt: '2024-04-01 14:00:00' },
+        { id: 'P008', name: '宠物用品组合', storeId: 'store_de', storeName: '德国站', ownerId: 'U002', ownerName: '李华', targetAcos: 22, currentAcos: 20.5, createdAt: '2024-04-10 09:30:00' },
+        { id: 'P009', name: '办公用品组合', storeId: 'store_jp', storeName: '日本站', ownerId: null, ownerName: null, targetAcos: 18, currentAcos: 21.3, createdAt: '2024-04-15 11:45:00' },
+        { id: 'P010', name: '母婴用品组合', storeId: 'store_us', storeName: '美国站', ownerId: 'U004', ownerName: '赵伟', targetAcos: 20, currentAcos: 17.8, createdAt: '2024-04-20 15:20:00' }
+      ];
+    }
+
+    // 渲染广告组合列表
+    function renderPortfolios(portfolioList) {
+      const tbody = document.getElementById('portfoliosTable');
+
+      if (portfolioList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">暂无广告组合数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = portfolioList.map(p => `
+        <tr class="${selectedIds.has(p.id) ? 'selected' : ''}">
+          <td class="checkbox-cell">
+            <input type="checkbox" class="checkbox" ${selectedIds.has(p.id) ? 'checked' : ''} onchange="toggleSelect('${p.id}')">
+          </td>
+          <td>
+            <strong>${p.name}</strong>
+            <div style="font-size: 11px; color: var(--text-secondary);">${p.id}</div>
+          </td>
+          <td><span class="store-badge store_${p.storeId.split('_')[1]}">${p.storeName}</span></td>
+          <td>
+            ${p.ownerId ? `
+              <div class="owner-cell">
+                <div class="owner-avatar">${p.ownerName.charAt(0)}</div>
+                <span class="owner-name">${p.ownerName}</span>
+              </div>
+            ` : '<span class="unassigned">未分配</span>'}
+          </td>
+          <td>${p.targetAcos}%</td>
+          <td style="color: ${p.currentAcos > p.targetAcos + 5 ? 'var(--danger)' : p.currentAcos < p.targetAcos ? 'var(--success)' : 'var(--text-primary)'}; font-weight: 500;">
+            ${p.currentAcos}%
+          </td>
+          <td style="font-size: 12px; color: var(--text-secondary);">${p.createdAt}</td>
+          <td>
+            <select class="owner-select" onchange="assignOwner('${p.id}', this.value)">
+              <option value="">分配负责人</option>
+              ${users.map(u => `<option value="${u.id}" ${p.ownerId === u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
+              ${p.ownerId ? '<option value="">取消分配</option>' : ''}
+            </select>
+          </td>
+        </tr>
+      `).join('');
+
+      // 更新全选状态
+      document.getElementById('selectAll').checked = portfolioList.length > 0 && selectedIds.size === portfolioList.length;
+    }
+
+    // 更新统计
+    function updateStats(portfolioList) {
+      document.getElementById('totalPortfolios').textContent = portfolioList.length;
+      document.getElementById('assignedCount').textContent = portfolioList.filter(p => p.ownerId).length;
+      document.getElementById('unassignedCount').textContent = portfolioList.filter(p => !p.ownerId).length;
+      document.getElementById('ownerCount').textContent = users.length;
+    }
+
+    // 切换全选
+    function toggleSelectAll() {
+      const selectAll = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('#portfoliosTable .checkbox');
+
+      if (selectAll.checked) {
+        portfolios.forEach(p => selectedIds.add(p.id));
+      } else {
+        selectedIds.clear();
+      }
+
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+      updateBatchBar();
+      renderPortfolios(portfolios);
+    }
+
+    // 切换单选
+    function toggleSelect(id) {
+      if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+      } else {
+        selectedIds.add(id);
+      }
+      updateBatchBar();
+    }
+
+    // 更新批量操作栏
+    function updateBatchBar() {
+      const batchBar = document.getElementById('batchBar');
+      const selectedCount = document.getElementById('selectedCount');
+
+      if (selectedIds.size > 0) {
+        batchBar.classList.add('show');
+        selectedCount.textContent = selectedIds.size;
+      } else {
+        batchBar.classList.remove('show');
+      }
+    }
+
+    // 清除选择
+    function clearSelection() {
+      selectedIds.clear();
+      updateBatchBar();
+      renderPortfolios(portfolios);
+    }
+
+    // 打开批量分配模态框
+    function openBatchAssignModal() {
+      if (selectedIds.size === 0) {
+        showToast('请先选择要分配的广告组合', 'error');
+        return;
+      }
+      document.getElementById('batchCount').textContent = selectedIds.size;
+      document.getElementById('assignModal').classList.add('show');
+    }
+
+    // 关闭批量分配模态框
+    function closeAssignModal() {
+      document.getElementById('assignModal').classList.remove('show');
+    }
+
+    // 批量分配负责人
+    async function batchAssignOwner() {
+      const ownerId = document.getElementById('batchOwner').value;
+      if (!ownerId) {
+        showToast('请选择负责人', 'error');
+        return;
+      }
+
+      if (selectedIds.size === 0) {
+        showToast('请先选择要分配的广告组合', 'error');
+        return;
+      }
+
+      const owner = users.find(u => u.id === ownerId);
+      const assignCount = selectedIds.size;
+      const ids = Array.from(selectedIds);
+
+      try {
+        const response = await fetch(`${API_BASE}/portfolios/batch-assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids, owner_id: ownerId })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          closeAssignModal();
+          clearSelection();
+          loadPortfolios();
+          showToast(`成功分配 ${assignCount} 个广告组合给 ${owner.name}`, 'success');
+        } else {
+          showToast(result.message || '分配失败', 'error');
+        }
+      } catch (error) {
+        console.error('分配失败:', error);
+        // 后备：更新本地数据
+        portfolios.forEach(p => {
+          if (selectedIds.has(p.id)) {
+            p.ownerId = ownerId;
+            p.ownerName = owner.name;
+          }
+        });
+        closeAssignModal();
+        clearSelection();
+        loadPortfolios();
+        showToast(`成功分配 ${assignCount} 个广告组合给 ${owner.name}`, 'success');
+      }
+    }
+
+    // 单个分配负责人（修复：调用后端API保存）
+    async function assignOwner(portfolioId, ownerId) {
+      const portfolio = portfolios.find(p => p.id === portfolioId);
+      if (!portfolio) return;
+
+      if (!ownerId) {
+        // 调用后端API取消分配
+        try {
+          await fetch(`${API_BASE}/portfolios/${portfolioId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ owner_id: null })
+          });
+        } catch (error) {
+          console.error('取消分配失败:', error);
+        }
+        portfolio.ownerId = null;
+        portfolio.ownerName = null;
+        loadPortfolios();
+        showToast('已取消分配', 'success');
+        return;
+      }
+
+      const owner = users.find(u => u.id === ownerId);
+      
+      // 调用后端API保存分配
+      try {
+        const response = await fetch(`${API_BASE}/portfolios/${portfolioId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ owner_id: ownerId })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          portfolio.ownerId = ownerId;
+          portfolio.ownerName = owner.name;
+          loadPortfolios();
+          showToast(`已将 "${portfolio.name}" 分配给 ${owner.name}`, 'success');
+        } else {
+          showToast(result.message || '分配失败', 'error');
+        }
+      } catch (error) {
+        console.error('分配失败:', error);
+        // 即使API失败，也更新本地数据作为后备
+        portfolio.ownerId = ownerId;
+        portfolio.ownerName = owner.name;
+        loadPortfolios();
+        showToast(`已将 "${portfolio.name}" 分配给 ${owner.name} (本地保存)`, 'success');
+      }
+    }
+
+    // Toast提示
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.className = 'toast ' + type + ' show';
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // 点击模态框外部关闭
+    document.getElementById('assignModal').addEventListener('click', (e) => {
+      if (e.target.id === 'assignModal') closeAssignModal();
+    });
+  </script>
+  <script src="components/sidebar.js"></script>
+</body>
+</html>

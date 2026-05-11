@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 - 亚马逊广告AI专家</title>
+  <style>
+    :root {
+      --primary: #667eea;
+      --primary-dark: #764ba2;
+      --bg-dark: #f5f6fa;
+      --bg-card: #ffffff;
+      --bg-input: #f3f4f6;
+      --text-primary: #1a1d26;
+      --text-secondary: #6b7280;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    .main {
+      margin-left: 260px;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h2 {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    /* 工具栏 */
+    .toolbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .toolbar .filter-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .toolbar .filter-group select {
+      padding: 6px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 120px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+    }
+
+    .btn-success:hover {
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    /* 表格 */
+    .table-container {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-header h3 {
+      font-size: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-input);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      font-size: 14px;
+    }
+
+    tr:hover td {
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-weight: 500;
+    }
+
+    .user-email {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .role-badge.admin {
+      background: rgba(102, 126, 234, 0.15);
+      color: var(--primary);
+    }
+
+    .role-badge.manager {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+    }
+
+    .role-badge.user {
+      background: rgba(107, 114, 128, 0.15);
+      color: var(--text-secondary);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.active {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .status-badge.inactive {
+      background: rgba(107, 114, 128, 0.15);
+      color: var(--text-secondary);
+    }
+
+    .action-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      background: var(--bg-input);
+      color: var(--text-secondary);
+    }
+
+    .action-btn:hover {
+      color: var(--primary);
+    }
+
+    .action-btn.delete:hover {
+      color: var(--danger);
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: 12px;
+      width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      font-size: 18px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .modal-close:hover { color: var(--text-primary); }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Toast提示 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 2000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast.show { display: flex; }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--danger); }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* 统计卡片 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
+    .stat-value.danger { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <div id="sidebar"></div>
+
+    <!-- 主内容区 -->
+    <main class="main">
+      <div class="header">
+        <h2>用户管理</h2>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">总用户数</div>
+          <div class="stat-value" id="totalUsers">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">管理员</div>
+          <div class="stat-value" id="adminCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">运营人员</div>
+          <div class="stat-value warning" id="managerCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">在线用户</div>
+          <div class="stat-value success" id="activeCount">0</div>
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <div class="filter-group">
+          <label>角色筛选：</label>
+          <select id="roleFilter" onchange="loadUsers()">
+            <option value="">全部角色</option>
+            <option value="admin">管理员</option>
+            <option value="manager">运营人员</option>
+            <option value="user">普通用户</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>状态：</label>
+          <select id="statusFilter" onchange="loadUsers()">
+            <option value="">全部状态</option>
+            <option value="active">启用</option>
+            <option value="inactive">禁用</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openAddUserModal()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          新建用户
+        </button>
+      </div>
+
+      <!-- 用户列表 -->
+      <div class="table-container">
+        <div class="table-header">
+          <h3>用户列表</h3>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>用户信息</th>
+              <th>角色</th>
+              <th>负责店铺</th>
+              <th>状态</th>
+              <th>最后登录</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable">
+            <!-- 动态填充 -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- 新增/编辑用户模态框 -->
+  <div class="modal-overlay" id="userModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">新建用户</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="userForm">
+          <input type="hidden" id="userId">
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>姓名 *</label>
+              <input type="text" id="userName" placeholder="请输入姓名" required>
+            </div>
+            <div class="form-group">
+              <label>角色 *</label>
+              <select id="userRole" required>
+                <option value="user">普通用户</option>
+                <option value="manager">运营人员</option>
+                <option value="admin">管理员</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>邮箱 *</label>
+            <input type="email" id="userEmail" placeholder="请输入邮箱" required>
+          </div>
+
+          <div class="form-group">
+            <label>初始密码 *</label>
+            <input type="password" id="userPassword" placeholder="请输入初始密码" required>
+          </div>
+
+          <div class="form-group">
+            <label>负责店铺</label>
+            <select id="userStores" multiple style="height: 120px;">
+              <option value="store_us">美国站 - Amazon.com</option>
+              <option value="store_uk">英国站 - Amazon.co.uk</option>
+              <option value="store_de">德国站 - Amazon.de</option>
+              <option value="store_jp">日本站 - Amazon.co.jp</option>
+            </select>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">按住Ctrl可多选</div>
+          </div>
+
+          <div class="form-group">
+            <label>状态</label>
+            <select id="userStatus">
+              <option value="active">启用</option>
+              <option value="inactive">禁用</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveUser()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast提示 -->
+  <div class="toast" id="toast">
+    <span id="toastMessage"></span>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/api';
+    let users = [];
+    let currentUserId = null;
+
+    // 模拟当前登录用户
+    const currentUser = {
+      id: 'U001',
+      name: '系统管理员',
+      role: 'admin'
+    };
+
+    // 管理员权限检查
+    function checkAdminPermission() {
+      if (currentUser.role !== 'admin') {
+        document.querySelector('.main').innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
+            <svg viewBox="0 0 24 24" width="80" height="80" fill="#ef4444" style="margin-bottom: 24px;">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z"/>
+            </svg>
+            <h2 style="font-size: 24px; color: #1a1d26; margin-bottom: 12px;">无权限访问</h2>
+            <p style="color: #6b7280; font-size: 16px;">此页面仅限管理员访问，您的账号没有权限查看此页面。</p>
+            <a href="index.html" style="margin-top: 24px; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-size: 14px;">返回首页</a>
+          </div>
+        `;
+        document.body.querySelector('.layout').style.display = 'none';
+        return false;
+      }
+      return true;
+    }
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!checkAdminPermission()) return;
+      loadUsers();
+    });
+
+    // 加载用户列表
+    async function loadUsers() {
+      const roleFilter = document.getElementById('roleFilter')?.value || '';
+      const statusFilter = document.getElementById('statusFilter')?.value || '';
+
+      try {
+        // 从后端获取真实数据
+        const res = await fetch(`${API_BASE}/users`);
+        const data = await res.json();
+        
+        if (data.success && data.data) {
+          users = data.data;
+        } else {
+          // 后端没有数据，使用模拟数据
+          users = getMockUsers();
+        }
+      } catch (e) {
+        console.log('获取用户列表失败，使用模拟数据');
+        users = getMockUsers();
+      }
+      
+      // 应用筛选
+      let filteredUsers = users;
+      if (roleFilter) {
+        filteredUsers = filteredUsers.filter(u => u.role === roleFilter);
+      }
+      if (statusFilter) {
+        filteredUsers = filteredUsers.filter(u => u.status === statusFilter);
+      }
+
+      renderUsers(filteredUsers);
+      updateStats(filteredUsers);
+    }
+
+    // 模拟用户数据
+    function getMockUsers() {
+      return [
+        {
+          id: 'U001',
+          name: '张明',
+          email: 'zhangming@company.com',
+          role: 'admin',
+          roleName: '管理员',
+          stores: ['store_us', 'store_uk', 'store_de', 'store_jp'],
+          storeNames: '全部店铺',
+          status: 'active',
+          lastLogin: '2026-04-30 09:30',
+          createdAt: '2024-01-15 10:00:00'
+        },
+        {
+          id: 'U002',
+          name: '李华',
+          email: 'lihua@company.com',
+          role: 'manager',
+          roleName: '运营人员',
+          stores: ['store_us', 'store_uk'],
+          storeNames: '美国站、英国站',
+          status: 'active',
+          lastLogin: '2026-04-29 18:45',
+          createdAt: '2024-02-20 14:30:00'
+        },
+        {
+          id: 'U003',
+          name: '王芳',
+          email: 'wangfang@company.com',
+          role: 'manager',
+          roleName: '运营人员',
+          stores: ['store_de', 'store_jp'],
+          storeNames: '德国站、日本站',
+          status: 'active',
+          lastLogin: '2026-04-30 08:15',
+          createdAt: '2024-03-10 09:00:00'
+        },
+        {
+          id: 'U004',
+          name: '赵伟',
+          email: 'zhaowei@company.com',
+          role: 'user',
+          roleName: '普通用户',
+          stores: ['store_us'],
+          storeNames: '美国站',
+          status: 'active',
+          lastLogin: '2026-04-28 17:30',
+          createdAt: '2024-04-05 11:20:00'
+        },
+        {
+          id: 'U005',
+          name: '陈静',
+          email: 'chenjing@company.com',
+          role: 'user',
+          roleName: '普通用户',
+          stores: ['store_uk'],
+          storeNames: '英国站',
+          status: 'inactive',
+          lastLogin: '2026-04-20 10:00',
+          createdAt: '2024-05-12 15:45:00'
+        }
+      ];
+    }
+
+    // 渲染用户列表
+    function renderUsers(userList) {
+      const tbody = document.getElementById('usersTable');
+      
+      if (userList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">暂无用户数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = userList.map(u => `
+        <tr>
+          <td>
+            <div class="user-info">
+              <div class="avatar">${u.name.charAt(0)}</div>
+              <div class="user-details">
+                <div class="user-name">${u.name}</div>
+                <div class="user-email">${u.email}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="role-badge ${u.role}">${u.roleName}</span></td>
+          <td style="font-size: 13px; color: var(--text-secondary);">${u.storeNames}</td>
+          <td><span class="status-badge ${u.status}">${u.status === 'active' ? '启用' : '禁用'}</span></td>
+          <td style="font-size: 13px; color: var(--text-secondary);">${u.lastLogin}</td>
+          <td style="font-size: 13px; color: var(--text-secondary);">${u.createdAt}</td>
+          <td>
+            <div class="action-btns">
+              <button class="action-btn" onclick="editUser('${u.id}')">编辑</button>
+              ${u.id !== 'U001' ? `
+                <button class="action-btn ${u.status === 'active' ? 'danger' : 'success'}" onclick="toggleUserStatus('${u.id}', '${u.status === 'active' ? 'inactive' : 'active'}')">
+                  ${u.status === 'active' ? '禁用' : '启用'}
+                </button>
+              ` : ''}
+              ${u.role !== 'admin' ? `
+                <button class="action-btn delete" onclick="deleteUser('${u.id}')">删除</button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 更新统计
+    function updateStats(userList) {
+      document.getElementById('totalUsers').textContent = userList.length;
+      document.getElementById('adminCount').textContent = userList.filter(u => u.role === 'admin').length;
+      document.getElementById('managerCount').textContent = userList.filter(u => u.role === 'manager').length;
+      document.getElementById('activeCount').textContent = userList.filter(u => u.status === 'active').length;
+    }
+
+    // 打开新增用户模态框
+    function openAddUserModal() {
+      currentUserId = null;
+      document.getElementById('modalTitle').textContent = '新建用户';
+      document.getElementById('userForm').reset();
+      document.getElementById('userId').value = '';
+      document.getElementById('userModal').classList.add('show');
+    }
+
+    // 编辑用户
+    function editUser(id) {
+      const user = users.find(u => u.id === id);
+      if (!user) return;
+
+      currentUserId = id;
+      document.getElementById('modalTitle').textContent = '编辑用户';
+      document.getElementById('userId').value = id;
+      document.getElementById('userName').value = user.name;
+      document.getElementById('userEmail').value = user.email;
+      document.getElementById('userRole').value = user.role;
+      document.getElementById('userStatus').value = user.status;
+      document.getElementById('userPassword').value = '';
+      document.getElementById('userPassword').required = false;
+      
+      // 设置店铺多选
+      const storesSelect = document.getElementById('userStores');
+      for (let i = 0; i < storesSelect.options.length; i++) {
+        storesSelect.options[i].selected = user.stores.includes(storesSelect.options[i].value);
+      }
+
+      document.getElementById('userModal').classList.add('show');
+    }
+
+    // 保存用户
+    async function saveUser() {
+      const form = document.getElementById('userForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const storesSelect = document.getElementById('userStores');
+      const selectedStores = [];
+      for (let i = 0; i < storesSelect.options.length; i++) {
+        if (storesSelect.options[i].selected) {
+          selectedStores.push(storesSelect.options[i].value);
+        }
+      }
+
+      const userData = {
+        name: document.getElementById('userName').value,
+        email: document.getElementById('userEmail').value,
+        role: document.getElementById('userRole').value,
+        status: document.getElementById('userStatus').value,
+        stores: selectedStores.join(',')
+      };
+
+      if (document.getElementById('userPassword').value) {
+        userData.password = document.getElementById('userPassword').value;
+      }
+
+      try {
+        let res;
+        if (currentUserId) {
+          // 更新用户
+          res = await fetch(`${API_BASE}/users/${currentUserId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        } else {
+          // 创建用户
+          userData.id = 'U' + Date.now().toString().slice(-6);
+          res = await fetch(`${API_BASE}/users`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        }
+        
+        const result = await res.json();
+        
+        if (result.success) {
+          showToast(currentUserId ? '用户更新成功' : '用户创建成功', 'success');
+          closeModal();
+          loadUsers();
+        } else {
+          showToast('保存失败: ' + result.message, 'error');
+        }
+      } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+      }
+    }
+
+    // 切换用户状态
+    async function toggleUserStatus(id, newStatus) {
+      if (!confirm(`确定要${newStatus === 'active' ? '启用' : '禁用'}该用户吗？`)) return;
+      
+      try {
+        const res = await fetch(`${API_BASE}/users/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+          showToast(`用户${newStatus === 'active' ? '启用' : '禁用'}成功`, 'success');
+          loadUsers();
+        } else {
+          showToast('操作失败: ' + result.message, 'error');
+        }
+      } catch (e) {
+        showToast('操作失败: ' + e.message, 'error');
+      }
+    }
+
+    // 删除用户
+    async function deleteUser(id) {
+      if (!confirm('确定要删除该用户吗？此操作不可恢复。')) return;
+      
+      try {
+        const res = await fetch(`${API_BASE}/users/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        
+        if (result.success) {
+          showToast('用户已删除', 'success');
+          loadUsers();
+        } else {
+          showToast('删除失败: ' + result.message, 'error');
+        }
+      } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+      }
+    }
+
+    // 关闭模态框
+    function closeModal() {
+      document.getElementById('userModal').classList.remove('show');
+      currentUserId = null;
+      document.getElementById('userPassword').required = true;
+    }
+
+    // Toast提示
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.className = 'toast ' + type + ' show';
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // 点击模态框外部关闭
+    document.getElementById('userModal').addEventListener('click', (e) => {
+      if (e.target.id === 'userModal') closeModal();
+    });
+  </script>
+  <script src="components/sidebar.js"></script>
+</body>
+</html>

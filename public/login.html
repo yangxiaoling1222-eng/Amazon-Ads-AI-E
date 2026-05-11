@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - 亚马逊广告AI专家</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 48px 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .login-logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-logo svg {
+      width: 36px;
+      height: 36px;
+    }
+    .login-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+    .login-subtitle {
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .form-group {
+      margin-bottom: 24px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .form-input::placeholder {
+      color: #9ca3af;
+    }
+    .remember-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .remember-me input {
+      width: 16px;
+      height: 16px;
+      accent-color: #667eea;
+    }
+    .forgot-link {
+      font-size: 13px;
+      color: #667eea;
+      text-decoration: none;
+    }
+    .forgot-link:hover {
+      text-decoration: underline;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px -10px rgba(102, 126, 234, 0.5);
+    }
+    .login-btn:active {
+      transform: translateY(0);
+    }
+    .login-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    .error-message {
+      background: #fee2e2;
+      color: #dc2626;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .error-message.show {
+      display: block;
+    }
+    .login-footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 6L8 12V20L16 26L24 20V12L16 6Z" fill="white" fill-opacity="0.9"/>
+            <path d="M16 10L12 13V19L16 22L20 19V13L16 10Z" fill="white"/>
+          </svg>
+        </div>
+        <h1 class="login-title">AI广告专家</h1>
+        <p class="login-subtitle">Amazon Ads Expert Platform</p>
+      </div>
+      
+      <div class="error-message" id="errorMessage"></div>
+      
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">邮箱</label>
+          <input 
+            type="email" 
+            class="form-input" 
+            id="email" 
+            placeholder="请输入邮箱"
+            required
+            value="admin@example.com"
+          >
+        </div>
+        <div class="form-group">
+          <label class="form-label">密码</label>
+          <input 
+            type="password" 
+            class="form-input" 
+            id="password" 
+            placeholder="请输入密码"
+            required
+            value="123456"
+          >
+        </div>
+        <div class="remember-row">
+          <label class="remember-me">
+            <input type="checkbox" id="rememberMe">
+            记住登录状态
+          </label>
+        </div>
+        <button type="submit" class="login-btn" id="loginBtn">
+          登录
+        </button>
+      </form>
+      
+      <div class="login-footer">
+        <p>演示账号：admin@example.com / 123456</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/api';
+    
+    // 如果已登录，直接跳转到首页
+    if (localStorage.getItem('currentUser')) {
+      window.location.href = 'index.html';
+    }
+    
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const rememberMe = document.getElementById('rememberMe').checked;
+      const loginBtn = document.getElementById('loginBtn');
+      const errorMessage = document.getElementById('errorMessage');
+      
+      // 清除错误
+      errorMessage.classList.remove('show');
+      errorMessage.textContent = '';
+      
+      // 禁用按钮
+      loginBtn.disabled = true;
+      loginBtn.textContent = '登录中...';
+      
+      try {
+        // 调用登录API
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || '登录失败');
+        }
+        
+        // 保存用户信息
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        
+        // 跳转到首页
+        window.location.href = 'index.html';
+        
+      } catch (error) {
+        // 如果API调用失败，尝试使用本地数据进行演示
+        console.log('API登录失败，使用本地演示数据:', error.message);
+        
+        // 演示模式：根据邮箱匹配用户
+        const demoUsers = {
+          'admin@example.com': {
+            id: 'U001',
+            name: '系统管理员',
+            email: 'admin@example.com',
+            role: 'admin',
+            stores: 'store_us,store_uk,store_de,store_jp'
+          },
+          'lihua@example.com': {
+            id: 'U002',
+            name: '李华',
+            email: 'lihua@example.com',
+            role: 'manager',
+            stores: 'store_us,store_uk'
+          },
+          'wangfang@example.com': {
+            id: 'U003',
+            name: '王芳',
+            email: 'wangfang@example.com',
+            role: 'manager',
+            stores: 'store_de,store_jp'
+          },
+          'zhaowei@example.com': {
+            id: 'U004',
+            name: '赵伟',
+            email: 'zhaowei@example.com',
+            role: 'user',
+            stores: 'store_us'
+          },
+          'qianmin@example.com': {
+            id: 'U005',
+            name: '钱敏',
+            email: 'qianmin@example.com',
+            role: 'user',
+            stores: 'store_uk'
+          }
+        };
+        
+        const user = demoUsers[email];
+        if (user && password === '123456') {
+          localStorage.setItem('currentUser', JSON.stringify(user));
+          window.location.href = 'index.html';
+        } else {
+          errorMessage.textContent = '邮箱或密码错误';
+          errorMessage.classList.add('show');
+        }
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = '登录';
+      }
+    }
+  </script>
+</body>
+</html>

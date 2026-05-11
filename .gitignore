@@ -1,0 +1,64 @@
+# 依赖
+node_modules/
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+
+# 编译输出
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 测试
+coverage/
+
+# 缓存
+.cache/
+.tmp/
+
+# 敏感配置文件
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+
+# 数据库文件（如果包含敏感数据）
+*.db
+*.sqlite
+*.sqlite3
+
+# 配置文件（可能包含密钥）
+config/local.js
+config/production.js
+secrets.json
+credentials.json
+
+# 系统简介（可能包含内部信息）
+系统简介.md
+
+# 工作流临时文件
+.workbuddy/
+.github/
+
+# 临时文档
+*.tmp.md
+草稿*/**

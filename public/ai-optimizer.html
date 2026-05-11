@@ -1,0 +1,3185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI自动优化 - 亚马逊广告AI专家</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root {
+      --primary: #667eea;
+      --primary-dark: #764ba2;
+      --bg-dark: #f5f6fa;
+      --bg-card: #ffffff;
+      --bg-input: #f3f4f6;
+      --text-primary: #1a1d26;
+      --text-secondary: #6b7280;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    .layout { min-height: 100vh; }
+
+    /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
+
+    /* 主内容区 - 左侧留出侧边栏宽度 */
+    .main {
+      margin-left: 260px;
+      padding: 24px;
+      overflow-y: auto;
+      min-height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h2 {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    /* ── 顶部 Tab 导航 ── */
+    .optimizer-tabs {
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 20px;
+      border: 1px solid #e5e7eb;
+      width: fit-content;
+    }
+    .optimizer-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+    }
+    
+    /* ── Tab 面板 ── */
+    #tab-targets,
+    #tab-keywords,
+    #tab-ai,
+    #tab-harvest {
+      display: none;
+    }
+    #tab-targets.active,
+    #tab-keywords.active,
+    #tab-ai.active,
+    #tab-harvest.active {
+      display: block !important;
+    }
+    .optimizer-tab {
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .optimizer-tab:hover { background: #f3f4f6; color: #374151; }
+    .optimizer-tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    /* ── 关键词管理 ── */
+    .kw-tags-overview {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .kw-tag-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 160px;
+    }
+    .kw-tag-card:hover { border-color: var(--primary); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .kw-tag-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .kw-tag-name { font-size: 13px; font-weight: 600; color: #1f2937; }
+    .kw-tag-count { font-size: 11px; color: #9ca3af; }
+    .kw-tag-shield {
+      margin-left: auto;
+      font-size: 14px;
+      opacity: 0.6;
+    }
+    .kw-tag-card.has-protection .kw-tag-shield { opacity: 1; }
+
+    /* 关键词列表 */
+    .kw-list { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+    .kw-list-header {
+      display: grid;
+      grid-template-columns: 40px 1fr 100px 100px 100px 80px 120px 100px;
+      padding: 12px 16px;
+      background: #fafafa;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      gap: 8px;
+      align-items: center;
+    }
+    .kw-item {
+      display: grid;
+      grid-template-columns: 40px 1fr 100px 100px 100px 80px 120px 100px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #f3f4f6;
+      gap: 8px;
+      align-items: center;
+      transition: background 0.15s;
+    }
+    .kw-item:hover { background: #fafafa; }
+    .kw-item:last-child { border-bottom: none; }
+    .kw-item.protected { background: rgba(16, 185, 129, 0.04); }
+    .kw-item.protected:hover { background: rgba(16, 185, 129, 0.08); }
+    .kw-check {
+      width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);
+    }
+    .kw-text { font-size: 13px; font-weight: 500; color: #1f2937; word-break: break-all; }
+    .kw-tag-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;
+    }
+    .kw-bid { font-size: 13px; font-weight: 600; color: var(--primary); }
+    .kw-acos { font-size: 13px; font-weight: 500; }
+    .kw-acos.good { color: #10b981; }
+    .kw-acos.warn { color: #f59e0b; }
+    .kw-acos.bad { color: #ef4444; }
+    .kw-status {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: #10b981; font-weight: 500;
+    }
+    .kw-status.protected::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+    .kw-actions { display: flex; gap: 6px; }
+    .kw-btn {
+      padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border: none; transition: all 0.2s;
+    }
+    .kw-btn-tag { background: #f3f4f6; color: #374151; }
+    .kw-btn-tag:hover { background: #e5e7eb; }
+    .kw-btn-shield { background: #d1fae5; color: #065f46; }
+    .kw-btn-shield:hover { background: #a7f3d0; }
+    .kw-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 60px; color: #9ca3af; }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid #e5e7eb;
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .kw-empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
+    .kw-empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .kw-protection-info {
+      padding: 10px 14px; background: #f0fdf4; border-radius: 8px;
+      font-size: 12px; color: #065f46; margin-top: 12px;
+    }
+
+    /* 批量标签模态框 */
+    .batch-tag-options { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+    .batch-tag-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; background: #fafafa; border-radius: 8px;
+      border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.2s;
+    }
+    .batch-tag-option:hover { border-color: var(--primary); background: #f0f9ff; }
+    .batch-tag-option input[type="radio"] { width: 16px; height: 16px; accent-color: var(--primary); }
+    .batch-tag-option .tag-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .batch-tag-option .tag-name { font-size: 14px; font-weight: 500; flex: 1; }
+    .batch-tag-option .tag-count { font-size: 12px; color: #9ca3af; }
+
+    /* 工具栏 */
+    .toolbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .toolbar .filter-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .toolbar .filter-group select {
+      padding: 6px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 160px;
+    }
+
+    .toolbar .filter-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .date-range {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .date-range label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .date-range input {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    /* 统计卡片 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
+    .stat-value.danger { color: var(--danger); }
+
+    /* 表格 */
+    .table-container {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-header h3 {
+      font-size: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-input);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      font-size: 14px;
+    }
+
+    tr:hover td {
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.active {
+      background: rgba(0, 210, 106, 0.15);
+      color: var(--success);
+    }
+
+    .status-badge.paused {
+      background: rgba(255, 183, 0, 0.15);
+      color: var(--warning);
+    }
+
+    .status-badge.error {
+      background: rgba(255, 71, 71, 0.15);
+      color: var(--danger);
+    }
+
+    .acos-cell {
+      font-weight: 600;
+    }
+
+    .acos-cell.low { color: var(--success); }
+    .acos-cell.normal { color: var(--text-primary); }
+    .acos-cell.high { color: var(--danger); }
+
+    .action-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .action-btn.view {
+      background: var(--bg-input);
+      color: var(--text-secondary);
+    }
+
+    .action-btn.view:hover {
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+
+    .action-btn.edit {
+      background: rgba(102, 126, 234, 0.1);
+      color: var(--primary);
+    }
+
+    .action-btn.pause {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .action-btn.pause:hover {
+      background: rgba(245, 158, 11, 0.25);
+    }
+
+    .action-btn.resume {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .action-btn.resume:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    .action-btn.delete {
+      background: rgba(255, 71, 71, 0.15);
+      color: var(--danger);
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: 12px;
+      width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      font-size: 18px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .modal-close:hover { color: var(--text-primary); }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* 自动化选项 */
+    .auto-options {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .auto-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .auto-option:hover {
+      border-color: var(--border);
+    }
+
+    .auto-option.selected {
+      border-color: var(--primary);
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .auto-option input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+    }
+
+    .auto-option label {
+      font-size: 13px;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* 详情抽屉 */
+    .drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      z-index: 1001;
+    }
+
+    .drawer-overlay.show { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: -600px;
+      width: 600px;
+      height: 100vh;
+      background: var(--bg-card);
+      transition: right 0.3s ease;
+      z-index: 1002;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawer.show { right: 0; }
+
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .drawer-header h3 {
+      font-size: 18px;
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 24px;
+    }
+
+    /* 活动卡片 */
+    .campaign-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .campaign-card {
+      background: var(--bg-input);
+      border-radius: 8px;
+      padding: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .campaign-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .campaign-card-header h4 {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .campaign-card-header span {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .campaign-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .campaign-metric {
+      font-size: 12px;
+    }
+
+    .campaign-metric label {
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .campaign-metric span {
+      font-weight: 600;
+    }
+
+    .campaign-card-footer {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .campaign-card-btn {
+      width: 100%;
+      padding: 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .campaign-card-btn:hover {
+      background: rgba(102, 126, 234, 0.1);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* 投放数据抽屉 */
+    .投放-drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      z-index: 1003;
+    }
+
+    .投放-drawer-overlay.show { display: block; }
+
+    .投放-drawer {
+      position: fixed;
+      top: 0;
+      right: -700px;
+      width: 700px;
+      max-width: 90vw;
+      height: 100vh;
+      background: var(--bg-card);
+      transition: right 0.3s ease;
+      z-index: 1004;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .投放-drawer.show { right: 0; }
+
+    .投放-drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .投放-drawer-header h3 {
+      font-size: 18px;
+    }
+
+    .投放-drawer-close {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 24px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .投放-drawer-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .投放-drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h4 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    /* 通知提示 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 2000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast.show { display: flex; }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--danger); }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* 响应式 */
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .campaign-cards { grid-template-columns: 1fr; }
+    }
+
+
+      background: var(--bg-input);
+      flex-shrink: 0;
+    }
+    .chat-panel-header h3 { font-size: 15px; font-weight: 600; }
+    .chat-panel-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .chat-panel-body::-webkit-scrollbar { width: 4px; }
+    .chat-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .chat-bubble { max-width: 78%; border-radius: 14px; padding: 12px 16px; line-height: 1.6; font-size: 14px; }
+    .chat-bubble.user { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-bubble.ai { align-self: flex-start; background: var(--bg-input); border-bottom-left-radius: 4px; }
+    .chat-bubble.system { align-self: center; background: rgba(102,126,234,.08); color: var(--text-secondary); font-size: 12px; padding: 6px 14px; border-radius: 20px; max-width: 60%; text-align: center; }
+    .chat-tool-card { align-self: flex-start; max-width: 90%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 12px; margin-bottom: 4px; }
+    .chat-tool-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; color: var(--primary); }
+    .chat-tool-status { margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+    .chat-tool-status.ok { background: rgba(16,185,129,.15); color: var(--success); }
+    .chat-tool-status.err { background: rgba(239,68,68,.15); color: var(--danger); }
+    .chat-thinking { align-self: flex-start; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); padding: 10px 16px; background: var(--bg-input); border-radius: 14px; border-bottom-left-radius: 4px; }
+    .chat-dot-pulse { display: flex; gap: 4px; }
+    .chat-dot-pulse span { width: 6px; height: 6px; background: var(--primary); border-radius: 50%; animation: chatPulse 1.2s infinite; }
+    .chat-dot-pulse span:nth-child(2) { animation-delay: .2s; }
+    .chat-dot-pulse span:nth-child(3) { animation-delay: .4s; }
+    @keyframes chatPulse { 0%,80%,100%{opacity:.3} 40%{opacity:1} }
+    .chat-panel-footer { padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .chat-quick-prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .chat-qp-btn { padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; transition: all .15s; white-space: nowrap; }
+    .chat-qp-btn:hover { border-color: var(--primary); color: var(--primary); background: rgba(102,126,234,.06); }
+    .chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+    .chat-input-wrap { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: flex-end; gap: 10px; transition: border-color .15s; }
+    .chat-input-wrap:focus-within { border-color: var(--primary); }
+    .chat-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 14px; resize: none; max-height: 120px; min-height: 24px; font-family: inherit; line-height: 1.5; }
+    .chat-send-btn { width: 38px; height: 38px; border-radius: 10px; background: var(--primary); border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+    .chat-send-btn:hover { background: var(--primary-dark); }
+    .chat-send-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .chat-welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px; text-align: center; flex: 1; }
+    .chat-welcome-icon { font-size: 36px; }
+    .chat-welcome h4 { font-size: 16px; font-weight: 600; }
+    .chat-welcome p { font-size: 13px; color: var(--text-secondary); max-width: 360px; line-height: 1.6; }
+    .chat-welcome-cards { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; }
+    .chat-ex-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; cursor: pointer; text-align: left; transition: all .15s; display: flex; align-items: center; gap: 8px; }
+    .chat-ex-card:hover { border-color: var(--primary); background: rgba(102,126,234,.05); }
+    .chat-ex-card span:first-child { font-size: 15px; flex-shrink: 0; }
+    .chat-panel-right { width: 280px; border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+    .chat-panel-section { padding: 14px; border-bottom: 1px solid var(--border); }
+    .chat-panel-section-title { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+    .chat-form-group { margin-bottom: 10px; }
+    .chat-form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+    .chat-form-group input, .chat-form-group select { width: 100%; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; padding: 7px 10px; font-size: 12px; outline: none; font-family: inherit; }
+    .chat-form-group input:focus, .chat-form-group select:focus { border-color: var(--primary); }
+    .chat-safe-mode { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); font-size: 12px; color: var(--warning); cursor: pointer; }
+    .chat-toggle { width: 34px; height: 18px; background: var(--border); border-radius: 9px; position: relative; transition: background .15s; flex-shrink: 0; }
+    .chat-toggle.on { background: var(--primary); }
+    .chat-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: #fff; transition: left .15s; }
+    .chat-toggle.on::after { left: 16px; }
+    .chat-tool-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; background: var(--bg-input); font-size: 11px; color: var(--text-secondary); }
+    .chat-tool-item span:first-child { font-size: 13px; }
+    .chat-stats { display: flex; flex-direction: column; gap: 6px; }
+    .chat-stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+    .chat-stat strong { color: var(--text-primary); }
+    .chat-layout { display: flex; height: 100%; }
+
+    /* ── 关键词收割 Tab ── */
+    .harvest-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .harvest-card-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .harvest-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .harvest-dot-orange { background: var(--primary); }
+    .harvest-dot-harvest { background: var(--success); }
+    .harvest-dot-negate { background: var(--danger); }
+    .harvest-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+    .harvest-stat { background: var(--bg-input); border-radius: 10px; padding: 14px; text-align: center; }
+    .harvest-stat .val { font-size: 26px; font-weight: 700; }
+    .harvest-stat .lbl { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+    .val-harvest { color: var(--success); }
+    .val-negate { color: var(--danger); }
+    .val-info { color: var(--warning); }
+    .val-total { color: var(--primary); }
+    .harvest-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .harvest-form-group { display: flex; flex-direction: column; gap: 5px; }
+    .harvest-form-group label { font-size: 11px; color: var(--text-secondary); }
+    .harvest-form-group input, .harvest-form-group select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; padding: 7px 10px; font-size: 12px; outline: none; }
+    .harvest-form-group input:focus, .harvest-form-group select:focus { border-color: var(--primary); }
+    .harvest-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+    .harvest-btn-primary { background: var(--primary); color: #fff; }
+    .harvest-btn-primary:hover { opacity: .9; }
+    .harvest-btn-success { background: var(--success); color: #fff; }
+    .harvest-btn-danger { background: var(--danger); color: #fff; }
+    .harvest-btn-ghost { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); }
+    .harvest-btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+    .harvest-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .harvest-btn-sm { padding: 5px 10px; font-size: 12px; }
+    .harvest-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+    .harvest-tab { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); transition: all .15s; }
+    .harvest-tab.active { border-color: var(--primary); color: var(--primary); background: rgba(102,126,234,.08); }
+    .harvest-action-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 0 4px; }
+    .harvest-select-info { font-size: 13px; color: var(--text-secondary); }
+    .harvest-select-info strong { color: var(--text-primary); }
+    .harvest-alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .harvest-alert-info { background: rgba(96,165,250,.1); border: 1px solid rgba(96,165,250,.3); color: #60a5fa; }
+    .harvest-alert-success { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3); color: var(--success); }
+    .harvest-alert-warning { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: var(--warning); }
+    .harvest-alert-danger { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: var(--danger); }
+    .harvest-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: var(--primary); border-radius: 50%; animation: harvestSpin .7s linear infinite; flex-shrink: 0; }
+    @keyframes harvestSpin { to { transform: rotate(360deg); } }
+    .harvest-table-wrap { overflow-x: auto; }
+    .harvest-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .harvest-table th { padding: 9px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--bg-input); }
+    .harvest-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .harvest-table tr:hover td { background: rgba(102,126,234,.04); }
+    .harvest-kw { font-weight: 600; color: var(--text-primary); }
+    .harvest-match-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .harvest-match-AUTO { background: rgba(255,153,0,.15); color: var(--primary); }
+    .harvest-match-EXACT { background: rgba(16,185,129,.15); color: var(--success); }
+    .harvest-match-PHRASE { background: rgba(96,165,250,.15); color: #60a5fa; }
+    .harvest-match-BROAD { background: rgba(167,139,250,.15); color: #a78bfa; }
+    .harvest-match-NEGATIVE_EXACT { background: rgba(239,68,68,.15); color: var(--danger); }
+    .harvest-acos-ok { color: var(--success); font-weight: 600; }
+    .harvest-acos-warn { color: var(--warning); font-weight: 600; }
+    .harvest-acos-bad { color: var(--danger); font-weight: 600; }
+    .harvest-bid-suggest { color: var(--primary); font-weight: 600; }
+    .harvest-reason { font-size: 11px; color: var(--text-secondary); max-width: 180px; }
+    .harvest-empty { padding: 40px; text-align: center; color: var(--text-secondary); }
+    .harvest-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 999; align-items: center; justify-content: center; }
+    .harvest-overlay.show { display: flex; }
+    .harvest-dialog { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; max-width: 460px; width: 90%; }
+    .harvest-dialog h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+    .harvest-dialog p { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.6; }
+    .harvest-dialog-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* 响应式 */
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .campaign-cards { grid-template-columns: 1fr; }
+      .harvest-grid-4 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .drawer { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <div id="sidebar"></div>
+
+    <!-- 主内容区 -->
+    <main class="main">
+      <div class="header">
+        <h2>⚡ AI自动优化</h2>
+      </div>
+
+      <!-- 顶部 Tab 导航 -->
+      <div class="optimizer-tabs">
+        <button id="tab-btn-targets" class="optimizer-tab active" onclick="switchTopTab('targets')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          优化目标
+        </button>
+        <button id="tab-btn-keywords" class="optimizer-tab" onclick="switchTopTab('keywords')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>
+          关键词管理
+        </button>
+        <button id="tab-btn-ai" class="optimizer-tab" onclick="switchTopTab('ai')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+          💬 AI 对话
+        </button>
+        <button id="tab-btn-harvest" class="optimizer-tab" onclick="switchTopTab('harvest')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+          🌾 关键词收割
+        </button>
+      </div>
+
+
+
+
+      <!-- ── Tab 1: 优化目标 ── -->
+      <div id="tab-targets" class="tab-panel active">
+        <!-- 工具栏 -->
+        <div class="toolbar">
+        <div class="filter-group">
+          <label>店铺筛选：</label>
+          <select id="storeFilter" onchange="onStoreChange()">
+            <option value="">全部店铺</option>
+            <option value="store_us">美国站 - Amazon.com</option>
+            <option value="store_uk">英国站 - Amazon.co.uk</option>
+            <option value="store_de">德国站 - Amazon.de</option>
+            <option value="store_jp">日本站 - Amazon.co.jp</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>时间筛选：</label>
+          <select id="timeFilter" onchange="onTimeFilterChange()">
+            <option value="7">最近7天</option>
+            <option value="14">最近14天</option>
+            <option value="30" selected>最近30天</option>
+            <option value="90">最近90天</option>
+            <option value="custom">自定义</option>
+          </select>
+        </div>
+        <div class="date-range" id="customDateRange" style="display: none;">
+          <label>自定义：</label>
+          <input type="date" id="startDate">
+          <span>至</span>
+          <input type="date" id="endDate">
+        </div>
+        <button class="btn btn-secondary" onclick="loadTargets()">刷新数据</button>
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          新增目标
+        </button>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">优化组合数</div>
+          <div class="stat-value" id="totalTargets">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">平均ACOS</div>
+          <div class="stat-value" id="avgAcos">0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">本周节省花费</div>
+          <div class="stat-value success" id="weeklySavings">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">执行操作数</div>
+          <div class="stat-value" id="totalActions">0</div>
+        </div>
+      </div>
+
+      <!-- 目标列表 -->
+      <div class="table-container">
+        <div class="table-header">
+          <h3>广告组合目标</h3>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>店铺</th>
+              <th>广告组合</th>
+              <th>负责人</th>
+              <th>目标ACOS</th>
+              <th>当前ACOS</th>
+              <th>状态</th>
+              <th>自动化操作</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="targetsTable">
+            <!-- 动态填充 -->
+          </tbody>
+        </table>
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17l4.59-4.59L16 11l-6 6z"/>
+          </svg>
+          <h4>暂无优化目标</h4>
+          <p>点击"新增目标"开始设置您的第一个广告组合优化目标</p>
+          <button class="btn btn-primary" onclick="openAddModal()">新增目标</button>
+        </div>
+      </div>
+      </div><!-- /tab-targets -->
+
+      <!-- ── Tab 2: 关键词管理 ── -->
+      <div id="tab-keywords" class="tab-panel">
+        <!-- 工具栏 -->
+        <div class="toolbar">
+          <div class="filter-group">
+            <label>店铺：</label>
+            <select id="kw-store-filter" onchange="loadKeywords()">
+              <option value="">全部店铺</option>
+              <option value="store_us">🇺🇸 美国站</option>
+              <option value="store_uk">🇬🇧 英国站</option>
+              <option value="store_de">🇩🇪 德国站</option>
+              <option value="store_jp">🇯🇵 日本站</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>标签：</label>
+            <select id="kw-tag-filter" onchange="loadKeywords()">
+              <option value="">全部标签</option>
+              <option value="TAG001">🌟 战略词</option>
+              <option value="TAG002">💎 利润词</option>
+              <option value="TAG003">📈 成长词</option>
+              <option value="TAG004">⚡ 测试词</option>
+              <option value="TAG005">🔴 待优化</option>
+            </select>
+          </div>
+          <div class="filter-group" style="flex: 1; max-width: 320px;">
+            <label>搜索：</label>
+            <input type="text" id="kw-search" placeholder="搜索关键词..." style="flex: 1; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px;" oninput="loadKeywords()">
+          </div>
+          <button class="btn btn-outline" onclick="openBatchTagModal()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>
+            批量打标签
+          </button>
+          <button class="btn btn-outline" onclick="loadKeywords()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            刷新
+          </button>
+        </div>
+
+        <!-- 标签概览 -->
+        <div class="kw-tags-overview" id="kw-tags-overview"></div>
+
+        <!-- 关键词列表 -->
+        <div class="kw-list" id="kw-list">
+          <div class="kw-loading" id="kw-loading">
+            <div class="spinner"></div>
+            <span>加载中...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab 3: AI 对话 ── -->
+      <div id="tab-ai" class="tab-panel">
+        <div class="chat-layout" style="height:calc(100vh - 200px); min-height:500px; background:#fff; border-radius:12px; border:1px solid var(--border); overflow:hidden;">
+          <!-- 左侧对话区 -->
+          <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+            <div class="chat-panel-header" style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px;">
+              <span style="font-size:22px;">🤖</span>
+              <div>
+                <h3 style="font-size:15px; font-weight:600;">AI 广告助手</h3>
+                <div style="font-size:12px; color:var(--text-secondary);">支持自然语言广告操作 · Function Calling</div>
+              </div>
+              <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                <button onclick="chatClearSession()" style="padding:6px 12px; border-radius:8px; font-size:12px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;" title="清除会话历史">🗑️ 清除</button>
+              </div>
+            </div>
+
+            <div class="chat-panel-body" id="chat-messages">
+              <div class="chat-welcome">
+                <div class="chat-welcome-icon">⚡</div>
+                <h4>AI 广告操作助手</h4>
+                <p>用自然语言指挥广告账户。AI 已就绪，直接输入指令即可。</p>
+                <div class="chat-welcome-cards">
+                  <button class="chat-ex-card" onclick="setChatInput(this.querySelector('span:last-child').textContent)">
+                    <span>📊</span><span>查看所有广告活动的 ACOS 排名</span>
+                  </button>
+                  <button class="chat-ex-card" onclick="setChatInput(this.querySelector('span:last-child').textContent)">
+                    <span>💰</span><span>帮我把 ACOS 超过 30% 的活动预算降低 20%</span>
+                  </button>
+                  <button class="chat-ex-card" onclick="setChatInput(this.querySelector('span:last-child').textContent)">
+                    <span>🎯</span><span>分析关键词表现，给出出价优化建议</span>
+                  </button>
+                  <button class="chat-ex-card" onclick="setChatInput(this.querySelector('span:last-child').textContent)">
+                    <span>🌾</span><span>执行关键词收割，从自动广告提取高转化词</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-panel-footer">
+              <div class="chat-quick-prompts">
+                <button class="chat-qp-btn" onclick="setChatInput('查看广告活动列表')">查看活动</button>
+                <button class="chat-qp-btn" onclick="setChatInput('帮我优化关键词出价')">优化出价</button>
+                <button class="chat-qp-btn" onclick="setChatInput('添加否定关键词')">否定词</button>
+                <button class="chat-qp-btn" onclick="setChatInput('执行关键词收割')">关键词收割</button>
+                <button class="chat-qp-btn" onclick="setChatInput('分析预算利用率')">预算分析</button>
+              </div>
+              <div class="chat-input-row">
+                <div class="chat-input-wrap">
+                  <textarea id="chat-input" class="chat-input" rows="1" placeholder="输入指令，例如：帮我分析 ACOS 超过 30% 的活动..." onkeydown="handleChatKey(event)" oninput="autoResizeChat(this)"></textarea>
+                </div>
+                <button id="chat-send-btn" class="chat-send-btn" onclick="sendChat()" title="发送 (Enter)">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧面板（精简版：模型信息 + 安全模式 + 工具 + 任务中心） -->
+          <div class="chat-panel-right">
+
+            <!-- 当前模型信息（只读，从系统配置读取） -->
+            <div class="chat-panel-section">
+              <div class="chat-panel-section-title">🤖 当前模型</div>
+              <div id="chat-model-info" style="padding:10px 12px;background:var(--bg-input);border-radius:8px;font-size:13px;">
+                <div id="chat-model-name" style="font-weight:600;color:var(--text-primary);">加载中…</div>
+                <div id="chat-model-provider" style="font-size:11px;color:var(--text-secondary);margin-top:2px;"></div>
+              </div>
+              <div id="chat-config-warn" style="display:none;margin-top:8px;padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e;">
+                ⚠️ 未配置 AI 模型，请前往
+                <a href="system-settings.html" style="color:#7c3aed;font-weight:600;">系统设置</a>
+                填写 API Key
+              </div>
+            </div>
+
+            <div class="chat-panel-section">
+              <div class="chat-panel-section-title">🛡️ 安全模式</div>
+              <div class="chat-safe-mode" id="chat-safe-toggle" onclick="toggleSafeMode()" title="开启后所有操作先预览，不实际执行">
+                <div class="chat-toggle on" id="chat-toggle-ui"></div>
+                <span id="chat-safe-label">安全模式 开</span>
+              </div>
+              <div style="font-size:11px; color:var(--text-secondary); margin-top:8px;">开启后：所有写操作先 dryRun 预览，不实际修改</div>
+            </div>
+
+            <div class="chat-panel-section">
+              <div class="chat-panel-section-title">🛠️ 可用工具</div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div class="chat-tool-item"><span>📊</span><span>查询广告活动</span></div>
+                <div class="chat-tool-item"><span>🎯</span><span>查询关键词</span></div>
+                <div class="chat-tool-item"><span>💰</span><span>调整预算</span></div>
+                <div class="chat-tool-item"><span>⏸️</span><span>暂停/启用活动</span></div>
+                <div class="chat-tool-item"><span>📈</span><span>调整出价</span></div>
+                <div class="chat-tool-item"><span>🚫</span><span>添加否定词</span></div>
+                <div class="chat-tool-item"><span>🌾</span><span>关键词收割</span></div>
+                <div class="chat-tool-item"><span>🤖</span><span>智能调价（ACOS）</span></div>
+              </div>
+            </div>
+
+            <div class="chat-panel-section">
+              <div class="chat-panel-section-title">📈 本次会话统计</div>
+              <div class="chat-stats">
+                <div class="chat-stat"><span>对话轮次</span><strong id="chat-stat-rounds">0</strong></div>
+                <div class="chat-stat"><span>工具调用</span><strong id="chat-stat-tools">0</strong></div>
+                <div class="chat-stat"><span>已创建任务</span><strong id="chat-stat-tasks">0</strong></div>
+              </div>
+              <a href="ai-tasks.html" id="chat-goto-tasks" style="display:none;margin-top:10px;padding:8px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;text-align:center;display:none;">
+                📋 查看任务中心
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab 4: 关键词收割 ── -->
+      <div id="tab-harvest" class="tab-panel">
+        <!-- 配置区 -->
+        <div class="harvest-card">
+          <div class="harvest-card-title"><div class="harvest-dot harvest-dot-orange"></div>收割配置</div>
+          <div class="harvest-controls">
+            <div class="harvest-form-group">
+              <label>开始日期</label>
+              <input type="date" id="hv-startDate">
+            </div>
+            <div class="harvest-form-group">
+              <label>结束日期</label>
+              <input type="date" id="hv-endDate">
+            </div>
+            <div class="harvest-form-group">
+              <label>最少订单数</label>
+              <input type="number" id="hv-minOrders" value="2" min="1" style="width:80px;">
+            </div>
+            <div class="harvest-form-group">
+              <label>最高 ACoS %</label>
+              <input type="number" id="hv-maxAcos" value="25" min="1" style="width:80px;">
+            </div>
+            <div class="harvest-form-group">
+              <label>最多点击（否定阈值）</label>
+              <input type="number" id="hv-maxClicks" value="30" min="1" style="width:80px;">
+            </div>
+            <div class="harvest-form-group" style="justify-content:flex-end;">
+              <label style="opacity:0;">.</label>
+              <button id="hv-btn-analyze" class="harvest-btn harvest-btn-primary" onclick="hvAnalyze()">🔍 分析</button>
+            </div>
+            <div class="harvest-form-group" style="justify-content:flex-end;">
+              <label style="opacity:0;">.</label>
+              <button class="harvest-btn harvest-btn-ghost" onclick="hvLoadDemo()">加载示例数据</button>
+            </div>
+          </div>
+          <div id="hv-alert-area" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="harvest-grid-4" id="hv-stats-area" style="display:none;">
+          <div class="harvest-stat"><div class="val val-total" id="hv-stat-total">0</div><div class="lbl">搜索词总数</div></div>
+          <div class="harvest-stat"><div class="val val-harvest" id="hv-stat-harvest">0</div><div class="lbl">可收割词</div></div>
+          <div class="harvest-stat"><div class="val val-negate" id="hv-stat-negate">0</div><div class="lbl">建议否定</div></div>
+          <div class="harvest-stat"><div class="val val-info" id="hv-stat-info">0</div><div class="lbl">观察中</div></div>
+        </div>
+
+        <!-- 结果区 -->
+        <div id="hv-result-area" style="display:none;">
+          <div class="harvest-card">
+            <!-- Tab 切换 -->
+            <div class="harvest-tabs">
+              <button class="harvest-tab active" onclick="hvSwitchTab('harvest')">🌾 收割 <span id="hv-tab-harvest-cnt"></span></button>
+              <button class="harvest-tab" onclick="hvSwitchTab('negate')">🚫 否定 <span id="hv-tab-negate-cnt"></span></button>
+              <button class="harvest-tab" onclick="hvSwitchTab('info')">👀 观察 <span id="hv-tab-info-cnt"></span></button>
+            </div>
+
+            <!-- 操作栏：收割 -->
+            <div id="hv-action-bar-harvest" class="harvest-action-bar" style="display:flex;">
+              <div class="harvest-select-info">已选 <strong id="hv-sel-harvest">0</strong> 个</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="harvest-btn harvest-btn-ghost harvest-btn-sm" onclick="hvSelectAll('harvest')">全选</button>
+                <button class="harvest-btn harvest-btn-ghost harvest-btn-sm" onclick="hvClearSel('harvest')">清空</button>
+                <button id="hv-btn-exec-harvest" class="harvest-btn harvest-btn-success harvest-btn-sm" disabled onclick="hvConfirmHarvest()">✅ 执行收割</button>
+              </div>
+            </div>
+
+            <!-- 操作栏：否定 -->
+            <div id="hv-action-bar-negate" class="harvest-action-bar" style="display:none;">
+              <div class="harvest-select-info">已选 <strong id="hv-sel-negate">0</strong> 个</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="harvest-btn harvest-btn-ghost harvest-btn-sm" onclick="hvSelectAll('negate')">全选</button>
+                <button class="harvest-btn harvest-btn-ghost harvest-btn-sm" onclick="hvClearSel('negate')">清空</button>
+                <button id="hv-btn-exec-negate" class="harvest-btn harvest-btn-danger harvest-btn-sm" disabled onclick="hvConfirmNegate()">🚫 执行否定</button>
+              </div>
+            </div>
+
+            <!-- 操作栏：观察 -->
+            <div id="hv-action-bar-info" class="harvest-action-bar" style="display:none;">
+              <div class="harvest-select-info" style="color:var(--text-secondary);">以下词继续观察，暂不操作</div>
+            </div>
+
+            <!-- 表格 -->
+            <div class="harvest-table-wrap">
+              <table class="harvest-table">
+                <thead id="hv-table-head"></thead>
+                <tbody id="hv-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- 新增/编辑目标模态框 -->
+  <div class="modal-overlay" id="targetModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">新增目标</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="targetForm">
+          <input type="hidden" id="targetId">
+          
+          <div class="form-group">
+            <label>选择广告组合 *</label>
+            <select id="portfolioSelect" required>
+              <option value="">请选择广告组合</option>
+              <!-- 动态填充 -->
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>目标ACOS (%) *</label>
+              <input type="number" id="targetAcos" step="0.1" min="0" max="100" placeholder="例如：15" required>
+            </div>
+            <div class="form-group">
+              <label>ACOS容差 (%)</label>
+              <input type="number" id="acosTolerance" step="0.1" min="0" max="20" value="5">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>每日预算上限</label>
+            <input type="number" id="dailyBudget" step="0.01" min="0" placeholder="不限制">
+          </div>
+
+          <div class="form-group">
+            <label>自动化操作（可多选）</label>
+            <div class="auto-options">
+              <div class="auto-option selected" data-value="bid">
+                <input type="checkbox" id="optBid" checked>
+                <label for="optBid">智能调价</label>
+              </div>
+              <div class="auto-option selected" data-value="negative">
+                <input type="checkbox" id="optNegative" checked>
+                <label for="optNegative">自动否词</label>
+              </div>
+              <div class="auto-option selected" data-value="keyword">
+                <input type="checkbox" id="optKeyword" checked>
+                <label for="optKeyword">新增关键词</label>
+              </div>
+              <div class="auto-option selected" data-value="placement">
+                <input type="checkbox" id="optPlacement" checked>
+                <label for="optPlacement">广告位调整</label>
+              </div>
+              <div class="auto-option" data-value="budget">
+                <input type="checkbox" id="optBudget">
+                <label for="optBudget">预算优化</label>
+              </div>
+              <div class="auto-option" data-value="pause">
+                <input type="checkbox" id="optPause">
+                <label for="optPause">暂停低效活动</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>出价调整幅度上限</label>
+              <input type="number" id="maxBidChange" step="0.1" min="0" max="50" value="20" placeholder="20%">
+            </div>
+            <div class="form-group">
+              <label>最低出价 ($)</label>
+              <input type="number" id="minBid" step="0.01" min="0" value="0.2" placeholder="0.20">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveTarget()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 详情抽屉 -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="detailDrawer">
+    <div class="drawer-header">
+      <h3 id="drawerTitle">组合详情</h3>
+      <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+    </div>
+    <div class="drawer-body">
+      <div id="drawerContent">
+        <!-- 动态填充 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast提示 -->
+  <div class="toast" id="toast">
+    <span id="toastMessage"></span>
+  </div>
+
+  <!-- 收割确认弹窗 -->
+  <div class="harvest-overlay" id="hv-confirm-overlay">
+    <div class="harvest-dialog">
+      <h3 id="hv-dlg-title">确认操作</h3>
+      <p id="hv-dlg-body"></p>
+      <div class="harvest-dialog-footer">
+        <button class="harvest-btn harvest-btn-ghost" onclick="hvCloseDialog()">取消</button>
+        <button class="harvest-btn harvest-btn-primary" onclick="hvExecute()">确认执行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投放数据抽屉 -->
+  <div class="投放-drawer-overlay" id="投放DrawerOverlay" onclick="close投放Drawer()"></div>
+  <div class="投放-drawer" id="投放Drawer">
+    <div class="投放-drawer-header">
+      <h3 id="投放DrawerTitle">广告活动详情</h3>
+      <button class="投放-drawer-close" onclick="close投放Drawer()">&times;</button>
+    </div>
+    <div class="投放-drawer-body" id="投放DrawerContent">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/api';
+    let targets = [];
+    let portfolios = [];
+    let currentEditingId = null;
+
+    // 当前登录用户（模拟）
+    const currentUser = {
+      id: 'U001',
+      name: '系统管理员',
+      role: 'admin',
+      stores: ['store_us', 'store_uk', 'store_de', 'store_jp']
+    };
+
+    // 模拟用户数据
+    const allUsers = [
+      { id: 'U001', name: '系统管理员', role: 'admin' },
+      { id: 'U002', name: '李华', role: 'manager' },
+      { id: 'U003', name: '王芳', role: 'manager' },
+      { id: 'U004', name: '赵伟', role: 'user' }
+    ];
+
+    // 操作日志
+    const operationLogs = [];
+
+    // 记录操作
+    function logOperation(action, targetName, details = '') {
+      const log = {
+        id: 'LOG' + Date.now(),
+        action,
+        targetName,
+        details,
+        operator: currentUser.name,
+        operatorId: currentUser.id,
+        timestamp: new Date().toLocaleString('zh-CN'),
+        date: formatDate(new Date())
+      };
+      operationLogs.unshift(log);
+      console.log('[操作日志]', log);
+    }
+
+    // 检查用户是否有权限操作该目标
+    function canOperateTarget(target) {
+      // 管理员可以操作所有目标
+      if (currentUser.role === 'admin') return true;
+      // 检查用户是否负责该目标对应的店铺
+      return target.ownerId === currentUser.id || currentUser.stores.includes(target.storeId);
+    }
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      initDates();
+      loadPortfolios();
+      loadTargets();
+      loadKeywordTags();
+      loadKeywords();
+      
+      // 为日期输入框添加变更事件
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+      if (startDateInput) {
+        startDateInput.addEventListener('change', onDateChange);
+      }
+      if (endDateInput) {
+        endDateInput.addEventListener('change', onDateChange);
+      }
+    });
+
+    // 日期变更事件
+    function onDateChange() {
+      loadTargets();
+    }
+
+    // 时间筛选变更事件
+    function onTimeFilterChange() {
+      const timeFilter = document.getElementById('timeFilter');
+      const customDateRange = document.getElementById('customDateRange');
+      
+      if (timeFilter.value === 'custom') {
+        // 显示自定义日期选择器
+        customDateRange.style.display = 'flex';
+        // 设置默认的自定义范围为最近30天
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        document.getElementById('endDate').value = formatDate(today);
+        document.getElementById('startDate').value = formatDate(thirtyDaysAgo);
+      } else {
+        // 隐藏自定义日期选择器，使用快捷选项
+        customDateRange.style.display = 'none';
+        // 根据快捷选项更新日期范围
+        const days = parseInt(timeFilter.value);
+        const today = new Date();
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - days);
+        
+        document.getElementById('endDate').value = formatDate(today);
+        document.getElementById('startDate').value = formatDate(startDate);
+        loadTargets();
+      }
+    }
+
+    // 初始化日期
+    function initDates() {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      document.getElementById('endDate').value = formatDate(today);
+      document.getElementById('startDate').value = formatDate(thirtyDaysAgo);
+    }
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    // 加载广告组合列表
+    async function loadPortfolios() {
+      try {
+        const res = await fetch(`${API_BASE}/portfolios`);
+        const data = await res.json();
+        if (data.success) {
+          portfolios = data.data || [];
+          renderPortfolioSelect();
+        }
+      } catch (e) {
+        console.error('加载组合失败', e);
+        // 使用示例数据
+        portfolios = [
+          { id: 'P001', name: '电子类产品组合', store_id: 'store_us', store_name: '美国站' },
+          { id: 'P002', name: '家居类产品组合', store_id: 'store_us', store_name: '美国站' },
+          { id: 'P003', name: '服装类产品组合', store_id: 'store_uk', store_name: '英国站' }
+        ];
+        renderPortfolioSelect();
+      }
+    }
+
+    function renderPortfolioSelect() {
+      const select = document.getElementById('portfolioSelect');
+      select.innerHTML = '<option value="">请选择广告组合</option>';
+      portfolios.forEach(p => {
+        const displayName = p.store_name ? `${p.name} (${p.store_name})` : p.name;
+        select.innerHTML += `<option value="${p.id || p.portfolioId}">${displayName}</option>`;
+      });
+    }
+
+    // 店铺变更事件
+    function onStoreChange() {
+      const storeId = document.getElementById('storeFilter').value;
+      loadTargets();
+      showToast(`已切换到 ${storeId ? getStoreName(storeId) : '全部店铺'}`, 'info');
+    }
+
+    // 获取店铺名称
+    function getStoreName(storeId) {
+      const stores = {
+        'store_us': '美国站',
+        'store_uk': '英国站',
+        'store_de': '德国站',
+        'store_jp': '日本站'
+      };
+      return stores[storeId] || storeId;
+    }
+
+    // 加载目标列表
+    async function loadTargets() {
+      const storeFilter = document.getElementById('storeFilter');
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+      
+      const storeId = storeFilter ? storeFilter.value : '';
+      const startDate = startDateInput ? startDateInput.value : '';
+      const endDate = endDateInput ? endDateInput.value : '';
+
+      try {
+        const url = `${API_BASE}/automation/targets?storeId=${storeId}&startDate=${startDate}&endDate=${endDate}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+          // 使用后端数据
+          targets = data.data.map(t => ({
+            id: t.id,
+            portfolioId: t.portfolio_id,
+            portfolioName: t.portfolio_name,
+            storeId: t.store_id,
+            storeName: t.store_name || getStoreName(t.store_id),
+            ownerId: t.owner_id,
+            ownerName: t.owner_name,
+            targetAcos: t.target_acos,
+            currentAcos: t.current_acos,
+            tolerance: t.tolerance,
+            status: t.status,
+            autoActions: t.autoActions || (t.auto_actions ? JSON.parse(t.auto_actions) : []),
+            createdAt: t.created_at,
+            dailyBudget: t.daily_budget,
+            maxBidChange: t.max_bid_change,
+            minBid: t.min_bid,
+            actionsCount: t.actions_count || 0,
+            weeklySpend: t.weekly_spend || 0
+          }));
+        } else {
+          // 后端没有数据或API失败，使用本地数据
+          targets = getFilteredMockData(storeId, startDate, endDate);
+        }
+      } catch (e) {
+        console.error('加载目标失败', e);
+        // 使用筛选后的示例数据（根据店铺和时间筛选）
+        targets = getFilteredMockData(storeId, startDate, endDate);
+      }
+      renderTargets();
+      updateStats();
+    }
+
+    // 根据筛选条件生成模拟数据
+    function getFilteredMockData(storeId, startDate, endDate) {
+      // 根据日期范围计算数据乘数
+      const days = calculateDays(startDate, endDate);
+      const multiplier = days / 30; // 基准是30天
+
+      const allMockData = [
+        {
+          id: 'T001',
+          storeId: 'store_us',
+          storeName: '美国站 - Amazon.com',
+          portfolioId: 'P001',
+          portfolioName: '电子类产品组合',
+          ownerId: 'U002',
+          ownerName: '李华',
+          targetAcos: 15,
+          currentAcos: (12.3 + Math.random() * 2 - 1).toFixed(1),
+          tolerance: 5,
+          status: 'active',
+          autoActions: ['bid', 'negative', 'keyword', 'placement'],
+          createdAt: '2026-04-25 10:30:00',
+          actionsCount: Math.round(45 * multiplier),
+          weeklySpend: Math.round(3200 * multiplier)
+        },
+        {
+          id: 'T002',
+          storeId: 'store_us',
+          storeName: '美国站 - Amazon.com',
+          portfolioId: 'P002',
+          portfolioName: '家居类产品组合',
+          ownerId: 'U002',
+          ownerName: '李华',
+          targetAcos: 20,
+          currentAcos: (28.5 + Math.random() * 3 - 1.5).toFixed(1),
+          tolerance: 5,
+          status: 'warning',
+          autoActions: ['bid', 'negative'],
+          createdAt: '2026-04-23 14:20:00',
+          actionsCount: Math.round(23 * multiplier),
+          weeklySpend: Math.round(1850 * multiplier)
+        },
+        {
+          id: 'T003',
+          storeId: 'store_uk',
+          storeName: '英国站 - Amazon.co.uk',
+          portfolioId: 'P003',
+          portfolioName: '服装类产品组合',
+          ownerId: 'U003',
+          ownerName: '王芳',
+          targetAcos: 18,
+          currentAcos: (16.2 + Math.random() * 2 - 1).toFixed(1),
+          tolerance: 4,
+          status: 'active',
+          autoActions: ['bid', 'negative', 'keyword'],
+          createdAt: '2026-04-22 09:15:00',
+          actionsCount: Math.round(38 * multiplier),
+          weeklySpend: Math.round(2100 * multiplier)
+        },
+        {
+          id: 'T004',
+          storeId: 'store_de',
+          storeName: '德国站 - Amazon.de',
+          portfolioId: 'P004',
+          portfolioName: '玩具类产品组合',
+          ownerId: null,
+          ownerName: null,
+          targetAcos: 22,
+          currentAcos: (19.8 + Math.random() * 2 - 1).toFixed(1),
+          tolerance: 5,
+          status: 'active',
+          autoActions: ['bid', 'negative', 'placement', 'budget'],
+          createdAt: '2026-04-21 11:00:00',
+          actionsCount: Math.round(52 * multiplier),
+          weeklySpend: Math.round(1560 * multiplier)
+        },
+        {
+          id: 'T005',
+          storeId: 'store_jp',
+          storeName: '日本站 - Amazon.co.jp',
+          portfolioId: 'P005',
+          portfolioName: '美妆类产品组合',
+          ownerId: 'U003',
+          ownerName: '王芳',
+          targetAcos: 16,
+          currentAcos: (24.1 + Math.random() * 3 - 1.5).toFixed(1),
+          tolerance: 3,
+          status: 'warning',
+          autoActions: ['bid', 'negative', 'pause'],
+          createdAt: '2026-04-20 16:45:00',
+          actionsCount: Math.round(17 * multiplier),
+          weeklySpend: Math.round(980 * multiplier)
+        }
+      ];
+
+      // 根据店铺筛选
+      if (!storeId) {
+        return allMockData;
+      }
+      return allMockData.filter(t => t.storeId === storeId);
+    }
+
+    // 计算日期范围天数
+    function calculateDays(startDate, endDate) {
+      if (!startDate || !endDate) return 30;
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(diffDays, 1);
+    }
+
+    // 渲染目标表格
+    function renderTargets() {
+      const tbody = document.getElementById('targetsTable');
+      const emptyState = document.getElementById('emptyState');
+
+      if (targets.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      tbody.innerHTML = targets.map(t => {
+        const acosStatus = getAcosStatus(t.currentAcos, t.targetAcos, t.tolerance);
+        const statusBadge = getStatusBadge(t.status);
+        const actionsList = t.autoActions.map(a => getActionName(a)).join(', ');
+        const storeDisplay = t.storeName || getStoreName(t.storeId) || '-';
+        const canOperate = canOperateTarget(t);
+
+        return `
+          <tr>
+            <td>
+              <strong>${storeDisplay}</strong>
+            </td>
+            <td>
+              <strong>${t.portfolioName}</strong>
+              <div style="font-size: 11px; color: var(--text-secondary);">${t.portfolioId}</div>
+            </td>
+            <td>
+              ${t.ownerName ? `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600;">
+                    ${t.ownerName.charAt(0)}
+                  </div>
+                  <span style="font-size: 13px;">${t.ownerName}</span>
+                </div>
+              ` : '<span style="color: var(--text-secondary); font-style: italic;">未分配</span>'}
+            </td>
+            <td>${t.targetAcos}%</td>
+            <td class="acos-cell ${acosStatus}">${t.currentAcos ? t.currentAcos.toFixed(1) + '%' : '-'}</td>
+            <td>${statusBadge}</td>
+            <td style="font-size: 12px; color: var(--text-secondary);">${actionsList || '-'}</td>
+            <td style="font-size: 12px; color: var(--text-secondary);">${t.createdAt}</td>
+            <td>
+              <div class="action-btns">
+                <button class="action-btn view" onclick="viewDetail('${t.id}')">查看</button>
+                ${canOperate ? `
+                  <button class="action-btn edit" onclick="editTarget('${t.id}')">编辑</button>
+                  ${t.status === 'active' ? `
+                    <button class="action-btn pause" onclick="toggleTargetStatus('${t.id}', 'paused')" title="暂停优化">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                      暂停
+                    </button>
+                  ` : `
+                    <button class="action-btn resume" onclick="toggleTargetStatus('${t.id}', 'active')" title="启动优化">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                      启动
+                    </button>
+                  `}
+                ` : `
+                  <span style="font-size: 11px; color: var(--text-secondary);">无权限</span>
+                `}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function getAcosStatus(current, target, tolerance) {
+      if (!current) return 'normal';
+      if (current > target + tolerance) return 'high';
+      if (current < target - tolerance) return 'low';
+      return 'normal';
+    }
+
+    function getStatusBadge(status) {
+      const badges = {
+        active: '<span class="status-badge active">运行中</span>',
+        paused: '<span class="status-badge paused">已暂停</span>',
+        warning: '<span class="status-badge error">异常</span>'
+      };
+      return badges[status] || badges.paused;
+    }
+
+    function getActionName(action) {
+      const names = {
+        bid: '调价',
+        negative: '否词',
+        keyword: '关键词',
+        placement: '广告位',
+        budget: '预算',
+        pause: '暂停'
+      };
+      return names[action] || action;
+    }
+
+    // 更新统计
+    function updateStats() {
+      document.getElementById('totalTargets').textContent = targets.length;
+      
+      const validAcos = targets.filter(t => t.currentAcos).map(t => t.currentAcos);
+      const avgAcos = validAcos.length > 0 
+        ? (validAcos.reduce((a, b) => a + b, 0) / validAcos.length).toFixed(1)
+        : 0;
+      document.getElementById('avgAcos').textContent = avgAcos + '%';
+      
+      const totalActions = targets.reduce((sum, t) => sum + (t.actionsCount || 0), 0);
+      document.getElementById('totalActions').textContent = totalActions;
+      
+      // 估算节省花费（基于高ACOS活动）
+      const highAcosTargets = targets.filter(t => t.currentAcos > t.targetAcos + t.tolerance);
+      const savings = highAcosTargets.reduce((sum, t) => sum + (t.weeklySpend || 0) * 0.15, 0);
+      document.getElementById('weeklySavings').textContent = '$' + savings.toFixed(0);
+    }
+
+    // 打开新增模态框
+    function openAddModal() {
+      currentEditingId = null;
+      document.getElementById('modalTitle').textContent = '新增目标';
+      document.getElementById('targetForm').reset();
+      document.getElementById('acosTolerance').value = 5;
+      document.getElementById('maxBidChange').value = 20;
+      document.getElementById('minBid').value = 0.2;
+      document.getElementById('targetModal').classList.add('show');
+    }
+
+    // 编辑目标
+    function editTarget(id) {
+      const target = targets.find(t => t.id === id);
+      if (!target) return;
+
+      currentEditingId = id;
+      document.getElementById('modalTitle').textContent = '编辑目标';
+      document.getElementById('targetId').value = id;
+      document.getElementById('portfolioSelect').value = target.portfolioId;
+      document.getElementById('targetAcos').value = target.targetAcos;
+      document.getElementById('acosTolerance').value = target.tolerance || 5;
+      document.getElementById('dailyBudget').value = target.dailyBudget || '';
+
+      // 设置自动化选项
+      ['bid', 'negative', 'keyword', 'placement', 'budget', 'pause'].forEach(opt => {
+        const checkbox = document.getElementById('opt' + opt.charAt(0).toUpperCase() + opt.slice(1));
+        checkbox.checked = target.autoActions?.includes(opt);
+      });
+
+      document.getElementById('targetModal').classList.add('show');
+    }
+
+    // 保存目标
+    async function saveTarget() {
+      const form = document.getElementById('targetForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const selectedActions = [];
+      ['bid', 'negative', 'keyword', 'placement', 'budget', 'pause'].forEach(opt => {
+        const checkbox = document.getElementById('opt' + opt.charAt(0).toUpperCase() + opt.slice(1));
+        if (checkbox.checked) selectedActions.push(opt);
+      });
+
+      const portfolioId = document.getElementById('portfolioSelect').value;
+      const portfolioOption = document.querySelector(`#portfolioSelect option[value="${portfolioId}"]`);
+      const portfolioName = portfolioOption ? portfolioOption.textContent : '';
+
+      // 从广告组合中获取店铺信息
+      const selectedPortfolio = portfolios.find(p => p.id === portfolioId || p.portfolioId === portfolioId);
+      const storeId = selectedPortfolio?.store_id || 'store_us';
+      const storeName = selectedPortfolio?.store_name || getStoreName(storeId);
+
+      const targetData = {
+        id: currentEditingId || 'T' + Date.now(),
+        portfolioId: portfolioId,
+        portfolioName: portfolioName,
+        storeId: storeId,
+        storeName: storeName,
+        targetAcos: parseFloat(document.getElementById('targetAcos').value),
+        tolerance: parseFloat(document.getElementById('acosTolerance').value) || 5,
+        dailyBudget: parseFloat(document.getElementById('dailyBudget').value) || null,
+        autoActions: selectedActions,
+        maxBidChange: parseFloat(document.getElementById('maxBidChange').value) / 100 || 0.2,
+        minBid: parseFloat(document.getElementById('minBid').value) || 0.2,
+        status: 'active',
+        ownerId: currentUser.id,
+        ownerName: currentUser.name
+      };
+
+      try {
+        if (currentEditingId) {
+          await fetch(`${API_BASE}/automation/targets/${currentEditingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(targetData)
+          });
+          logOperation('编辑目标', portfolioName, `目标ACOS: ${targetData.targetAcos}%, 自动化操作: ${selectedActions.join(', ')}`);
+          showToast('目标更新成功', 'success');
+        } else {
+          const response = await fetch(`${API_BASE}/automation/targets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(targetData)
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.message || '创建失败');
+          }
+          logOperation('创建目标', portfolioName, `目标ACOS: ${targetData.targetAcos}%, 负责人: ${currentUser.name}`);
+          showToast('目标创建成功', 'success');
+        }
+        closeModal();
+        loadTargets();
+      } catch (e) {
+        console.error('保存失败:', e);
+        // 离线模式：在本地模拟保存
+        const localTarget = {
+          ...targetData,
+          id: targetData.id,
+          currentAcos: (Math.random() * 5 + 10).toFixed(1),
+          actionsCount: 0,
+          weeklySpend: 0,
+          createdAt: new Date().toLocaleString('zh-CN')
+        };
+        
+        if (currentEditingId) {
+          const idx = targets.findIndex(t => t.id === currentEditingId);
+          if (idx >= 0) targets[idx] = { ...targets[idx], ...targetData };
+        } else {
+          targets.unshift(localTarget);
+        }
+        
+        renderTargets();
+        updateStats();
+        logOperation(currentEditingId ? '编辑目标' : '创建目标', portfolioName, `目标ACOS: ${targetData.targetAcos}%`);
+        showToast(currentEditingId ? '目标更新成功' : '目标创建成功', 'success');
+        closeModal();
+      }
+    }
+
+    // 删除目标
+    async function deleteTarget(id) {
+      const target = targets.find(t => t.id === id);
+      if (!target) return;
+      
+      if (!confirm('确定要删除这个优化目标吗？')) return;
+      
+      if (!canOperateTarget(target)) {
+        showToast('您没有权限删除此目标', 'error');
+        return;
+      }
+
+      try {
+        await fetch(`${API_BASE}/automation/targets/${id}`, { method: 'DELETE' });
+        logOperation('删除目标', target.portfolioName, `目标ACOS: ${target.targetAcos}%, 当前ACOS: ${target.currentAcos}%`);
+        showToast('目标已删除', 'success');
+        loadTargets();
+      } catch (e) {
+        showToast('删除失败', 'error');
+      }
+    }
+
+    // 切换目标状态（暂停/启动）
+    async function toggleTargetStatus(id, newStatus) {
+      const target = targets.find(t => t.id === id);
+      if (!target) return;
+
+      if (!canOperateTarget(target)) {
+        showToast('您没有权限操作此目标', 'error');
+        return;
+      }
+
+      const actionText = newStatus === 'paused' ? '暂停' : '启动';
+      
+      if (!confirm(`确定要${actionText} "${target.portfolioName}" 的自动优化吗？`)) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/automation/targets/${id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        
+        const result = await response.json();
+        if (result.success || response.ok) {
+          // 更新本地数据
+          const localTarget = targets.find(t => t.id === id);
+          if (localTarget) {
+            localTarget.status = newStatus;
+          }
+          logOperation(actionText + '优化', target.portfolioName, `负责人: ${target.ownerName || '未分配'}`);
+          renderTargets();
+          showToast(`${actionText}成功`, 'success');
+        } else {
+          showToast(`${actionText}失败`, 'error');
+        }
+      } catch (e) {
+        // 离线模式：直接更新本地数据
+        const localTarget = targets.find(t => t.id === id);
+        if (localTarget) {
+          localTarget.status = newStatus;
+        }
+        renderTargets();
+        showToast(`${actionText}成功`, 'success');
+      }
+    }
+
+    // 查看详情
+    async function viewDetail(id) {
+      const target = targets.find(t => t.id === id);
+      if (!target) return;
+
+      document.getElementById('drawerTitle').textContent = target.portfolioName + ' - 详情';
+      
+      // 示例活动数据
+      const campaigns = [
+        { id: 'C001', name: 'Auto - 广泛匹配', type: '自动', acos: 11.2, spend: 1250, sales: 11160, status: 'active' },
+        { id: 'C002', name: '手动 - 精准匹配 关键词A', type: '手动', acos: 15.8, spend: 890, sales: 5633, status: 'active' },
+        { id: 'C003', name: '手动 - 词组匹配 关键词B', type: '手动', acos: 18.5, spend: 560, sales: 3027, status: 'active' },
+        { id: 'C004', name: '商品投放 - ASIN测试', type: 'SD', acos: 22.3, spend: 320, sales: 1435, status: 'warning' }
+      ];
+
+      document.getElementById('drawerContent').innerHTML = `
+        <div style="margin-bottom: 24px;">
+          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">目标设置</h4>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div class="stat-card">
+              <div class="stat-label">目标ACOS</div>
+              <div class="stat-value" style="font-size: 20px;">${target.targetAcos}%</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">当前ACOS</div>
+              <div class="stat-value ${getAcosStatus(target.currentAcos, target.targetAcos, target.tolerance) === 'high' ? 'danger' : 'success'}" style="font-size: 20px;">${target.currentAcos ? target.currentAcos.toFixed(1) + '%' : '-'}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">本周花费</div>
+              <div class="stat-value" style="font-size: 20px;">$${(campaigns.reduce((s, c) => s + c.spend, 0)).toFixed(0)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">广告活动</h4>
+          <div class="campaign-cards">
+            ${campaigns.map(c => `
+              <div class="campaign-card">
+                <div class="campaign-card-header">
+                  <div>
+                    <h4>${c.name}</h4>
+                    <span>${c.type}</span>
+                  </div>
+                  <span class="status-badge ${c.status === 'active' ? 'active' : 'warning'}">${c.status === 'active' ? '正常' : '异常'}</span>
+                </div>
+                <div class="campaign-metrics">
+                  <div class="campaign-metric">
+                    <label>ACOS</label>
+                    <span style="color: ${c.acos > 20 ? 'var(--danger)' : c.acos < 15 ? 'var(--success)' : 'var(--text-primary)'}">${c.acos}%</span>
+                  </div>
+                  <div class="campaign-metric">
+                    <label>花费</label>
+                    <span>$${c.spend}</span>
+                  </div>
+                  <div class="campaign-metric">
+                    <label>销售额</label>
+                    <span>$${c.sales}</span>
+                  </div>
+                  <div class="campaign-metric">
+                    <label>ROAS</label>
+                    <span>${(c.sales / c.spend).toFixed(1)}</span>
+                  </div>
+                </div>
+                <div class="campaign-card-footer">
+                  <button class="campaign-card-btn" onclick="viewCampaignDetail('${c.id}', '${c.name}', '${c.type}')">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                    查看投放数据
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div>
+          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">AI执行记录</h4>
+          <div style="background: var(--bg-input); border-radius: 8px; padding: 12px;">
+            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between;">
+                <span>降低出价 - Auto广泛匹配</span>
+                <span style="color: var(--success);">完成</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">出价 $1.20 → $1.05 | ACOS改善 3.2%</div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                <span style="font-size: 11px; color: var(--text-secondary);">2024-04-28 14:30</span>
+                <span style="font-size: 11px; color: var(--primary);">操作员：AI自动</span>
+              </div>
+            </div>
+            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between;">
+                <span>添加否定词 - 商品投放</span>
+                <span style="color: var(--success);">完成</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">添加 5 个否定关键词 | 预计节省 $12/天</div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                <span style="font-size: 11px; color: var(--text-secondary);">2024-04-28 10:15</span>
+                <span style="font-size: 11px; color: var(--primary);">操作员：${target.ownerName || 'AI自动'}</span>
+              </div>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>新增关键词 - 手动精准</span>
+                <span style="color: var(--success);">完成</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">添加 3 个高表现关键词 | 建议出价 $0.85</div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                <span style="font-size: 11px; color: var(--text-secondary);">2024-04-27 16:45</span>
+                <span style="font-size: 11px; color: var(--primary);">操作员：李华</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 管理员查看操作日志 -->
+        ${currentUser.role === 'admin' ? `
+        <div style="margin-top: 24px;">
+          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">操作日志</h4>
+          <div style="background: var(--bg-input); border-radius: 8px; padding: 12px;">
+            ${getTargetLogs(target.id).map(log => `
+              <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="font-weight: 500;">${log.action}</span>
+                  <span style="color: var(--success); font-size: 12px;">${log.operator}</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${log.details}</div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">${log.timestamp}</div>
+              </div>
+            `).join('')}
+            ${getTargetLogs(target.id).length === 0 ? '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">暂无操作记录</div>' : ''}
+          </div>
+        </div>
+        ` : ''}
+      `;
+
+      document.getElementById('drawerOverlay').classList.add('show');
+      document.getElementById('detailDrawer').classList.add('show');
+    }
+
+    // 获取目标的操作日志
+    function getTargetLogs(targetId) {
+      // 筛选出与该目标相关的操作日志
+      return operationLogs.filter(log => log.targetName.includes(targetId) || log.targetName === targetId);
+    }
+
+    // 查看广告活动投放数据
+    function viewCampaignDetail(campaignId, campaignName, campaignType) {
+      document.getElementById('投放DrawerTitle').textContent = campaignName + ' - 投放数据';
+
+      // 根据活动ID生成模拟汇总数据
+      const mockSummary = {
+        impressions: Math.floor(Math.random() * 50000) + 10000,
+        clicks: Math.floor(Math.random() * 3000) + 500,
+        spend: (Math.random() * 2000 + 300).toFixed(2),
+        orders: Math.floor(Math.random() * 100) + 20
+      };
+      const summary = {
+        ...mockSummary,
+        ctr: ((mockSummary.clicks / mockSummary.impressions) * 100).toFixed(1),
+        avgCpc: (mockSummary.spend / mockSummary.clicks).toFixed(2),
+        sales: (mockSummary.orders * 85).toFixed(2),
+        convRate: ((mockSummary.orders / mockSummary.clicks) * 100).toFixed(1)
+      };
+
+      document.getElementById('投放DrawerContent').innerHTML = `
+        <!-- 汇总数据卡片 -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+          <div class="stat-card">
+            <div class="stat-label">曝光量</div>
+            <div class="stat-value" style="font-size: 18px;">${formatNumber(summary.impressions)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">点击量</div>
+            <div class="stat-value" style="font-size: 18px;">${formatNumber(summary.clicks)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">点击率</div>
+            <div class="stat-value" style="font-size: 18px;">${summary.ctr}%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">平均CPC</div>
+            <div class="stat-value" style="font-size: 18px;">$${summary.avgCpc}</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+          <div class="stat-card">
+            <div class="stat-label">花费</div>
+            <div class="stat-value" style="font-size: 18px;">$${summary.spend}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">订单数</div>
+            <div class="stat-value" style="font-size: 18px;">${summary.orders}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">销售额</div>
+            <div class="stat-value success" style="font-size: 18px;">$${summary.sales}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">转化率</div>
+            <div class="stat-value" style="font-size: 18px;">${summary.convRate}%</div>
+          </div>
+        </div>
+
+        <div style="text-align: center; padding: 24px; color: var(--text-secondary); font-size: 13px;">
+          关键词详情请在「关键词管理」标签页查看
+        </div>
+      `;
+
+      document.getElementById('投放DrawerOverlay').classList.add('show');
+      document.getElementById('投放Drawer').classList.add('show');
+    }
+
+    // 格式化数字
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toString();
+    }
+
+    // 关闭投放数据抽屉
+    function close投放Drawer() {
+      document.getElementById('投放DrawerOverlay').classList.remove('show');
+      document.getElementById('投放Drawer').classList.remove('show');
+    }
+
+    // 关闭模态框
+    function closeModal() {
+      document.getElementById('targetModal').classList.remove('show');
+      currentEditingId = null;
+    }
+
+    // 关闭抽屉
+    function closeDrawer() {
+      document.getElementById('drawerOverlay').classList.remove('show');
+      document.getElementById('detailDrawer').classList.remove('show');
+    }
+
+    // Toast提示
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.className = 'toast ' + type + ' show';
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // 自动化选项点击
+    document.querySelectorAll('.auto-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const checkbox = opt.querySelector('input[type="checkbox"]');
+        checkbox.checked = !checkbox.checked;
+        opt.classList.toggle('selected', checkbox.checked);
+      });
+    });
+
+    // 点击模态框外部关闭
+    document.getElementById('targetModal').addEventListener('click', (e) => {
+      if (e.target.id === 'targetModal') closeModal();
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    // 顶部 Tab 切换
+    // ─────────────────────────────────────────────────────────────────
+    function switchTopTab(tabId) {
+      // 切换按钮高亮
+      document.querySelectorAll('.optimizer-tab').forEach(t => t.classList.remove('active'));
+      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // 切换面板显示（只用 class 控制）
+      const allPanelIds = ['tab-targets', 'tab-keywords', 'tab-ai', 'tab-harvest'];
+      allPanelIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (id === 'tab-' + tabId) {
+          el.classList.add('active');
+          // 切换到关键词标签时加载数据
+          if (tabId === 'keywords') loadKeywords();
+          // 切换到 AI 对话时加载系统模型配置
+          if (tabId === 'ai') loadChatConfig();
+        } else {
+          el.classList.remove('active');
+        }
+      });
+    }
+
+
+    // ─────────────────────────────────────────────────────────────────
+    // AI 对话功能（来自 ai-agent.html）
+    // ─────────────────────────────────────────────────────────────────
+    const CHAT_API = 'http://localhost:3000/api';
+    let chatSessionId = 'sess-' + Math.random().toString(36).slice(2, 10);
+    let chatSafeMode = true;
+    let chatIsThinking = false;
+    let chatRounds = 0, chatToolCalls = 0;
+
+    // 启动时加载系统配置信息（只展示，不需要用户填写）
+    async function loadChatConfig() {
+      try {
+        const res  = await fetch(`${CHAT_API}/agent/config`);
+        const json = await res.json();
+        const nameEl     = document.getElementById('chat-model-name');
+        const providerEl = document.getElementById('chat-model-provider');
+        const warnEl     = document.getElementById('chat-config-warn');
+        if (json.data?.configured) {
+          if (nameEl)     nameEl.textContent     = json.data.model || '已配置';
+          if (providerEl) providerEl.textContent = json.data.provider || '';
+          if (warnEl)     warnEl.style.display   = 'none';
+        } else {
+          if (nameEl)     nameEl.textContent     = '未配置';
+          if (providerEl) providerEl.textContent = '请前往系统设置';
+          if (warnEl)     warnEl.style.display   = 'block';
+        }
+      } catch (e) {
+        const nameEl = document.getElementById('chat-model-name');
+        if (nameEl) nameEl.textContent = '获取配置失败';
+      }
+    }
+
+    // 页面切换到 AI 对话 Tab 时加载配置
+    document.addEventListener('DOMContentLoaded', () => {
+      // 如果直接在 AI 对话 tab，立即加载
+      if (document.getElementById('tab-ai')?.classList.contains('active')) {
+        loadChatConfig();
+      }
+    });
+
+    function escapeHtml(t) {
+      return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function scrollChatToBottom() {
+      const el = document.getElementById('chat-messages');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function autoResizeChat(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function handleChatKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    }
+
+    function toggleChatSafeMode() {
+      chatSafeMode = !chatSafeMode;
+      document.getElementById('chat-safe-toggle').classList.toggle('on', chatSafeMode);
+      appendChatBubble('system', chatSafeMode ? '🔒 安全模式已开启，操作将先预览' : '🔓 安全模式已关闭，AI 可直接执行');
+    }
+
+    function insertChatPrompt(text) {
+      document.getElementById('chat-input').value = text;
+      document.getElementById('chat-input').focus();
+    }
+
+    function sendChatExample(text) {
+      document.getElementById('chat-input').value = text;
+      sendChat();
+    }
+
+    function clearChat() {
+      const msgs = document.getElementById('chat-messages');
+      msgs.innerHTML = `
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="chat-welcome-icon">🤖</div>
+          <h4>对话已清空</h4>
+          <p style="color:var(--text-secondary)">随时可以开始新的对话</p>
+        </div>`;
+      chatRounds = chatToolCalls = 0;
+      const rEl = document.getElementById('chat-stat-rounds');
+      const tEl = document.getElementById('chat-stat-tools');
+      if (rEl) rEl.textContent = '0';
+      if (tEl) tEl.textContent = '0';
+    }
+
+    function appendChatBubble(type, html) {
+      const msgs = document.getElementById('chat-messages');
+      document.getElementById('chat-welcome')?.remove();
+      const el = document.createElement('div');
+      el.className = 'chat-bubble ' + type;
+      el.innerHTML = html;
+      msgs.appendChild(el);
+      scrollChatToBottom();
+      return el;
+    }
+
+    function appendChatThinking() {
+      const el = document.createElement('div');
+      el.className = 'chat-thinking';
+      el.id = 'chat-thinking-el';
+      el.innerHTML = '<div class="chat-dot-pulse"><span></span><span></span><span></span></div> AI 正在思考…';
+      document.getElementById('chat-messages').appendChild(el);
+      scrollChatToBottom();
+      return el;
+    }
+
+    function appendChatToolCard(tool, ok, result) {
+      const msgs = document.getElementById('chat-messages');
+      document.getElementById('chat-welcome')?.remove();
+      const icon = { get_campaigns:'📋', update_campaign_budgets:'💰', pause_campaigns:'⏸️', enable_campaigns:'▶️', get_keywords:'🔑', adjust_keyword_bids:'🎯', add_negative_keywords:'🚫', harvest_keywords:'🌾', apply_smart_bids:'⚡' }[tool] || '🔧';
+      let summary = '';
+      if (result) {
+        if (!result.success) summary = `<span style="color:var(--danger)">错误：${result.error || '未知错误'}</span>`;
+        else if (tool === 'get_campaigns') summary = `找到 <strong>${result.count}</strong> 个广告活动`;
+        else if (tool === 'get_keywords') summary = `找到 <strong>${result.count}</strong> 个关键词`;
+        else if (tool === 'update_campaign_budgets') summary = `更新 <strong>${result.updated}</strong> 个预算`;
+        else if (tool === 'pause_campaigns') summary = `暂停 <strong>${result.paused}</strong> 个活动`;
+        else if (tool === 'harvest_keywords') summary = result.dryRun ? `预览：可收割 <strong>${result.summary?.harvestCount}</strong> 个` : `已收割 <strong>${result.summary?.harvestCount}</strong> 个`;
+        else summary = JSON.stringify(result).slice(0, 100);
+      }
+      const card = document.createElement('div');
+      card.className = 'chat-tool-card';
+      card.innerHTML = `<div class="chat-tool-header"><span>${icon}</span><span>${tool}</span><span class="chat-tool-status ${ok ? 'ok' : 'err'}">${ok ? '✓' : '✗'}</span></div><div style="color:var(--text-secondary);font-size:12px;">${summary}</div>`;
+      msgs.appendChild(card);
+      scrollChatToBottom();
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      if (!message || chatIsThinking) return;
+
+      appendChatBubble('user', escapeHtml(message));
+      input.value = ''; input.style.height = 'auto';
+
+      const thinkEl = appendChatThinking();
+      chatIsThinking = true;
+      document.getElementById('chat-send-btn').disabled = true;
+
+      try {
+        const res = await fetch(`${CHAT_API}/agent/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            sessionId: chatSessionId,
+            dryRunAll: chatSafeMode
+            // apiKey/model/profileId 由后端从系统配置自动读取
+          })
+        });
+        const data = await res.json();
+        thinkEl.remove();
+
+        if (!data.success && data.message?.includes('API Key')) {
+          appendChatBubble('system', '⚠️ 未配置 AI 模型，请前往 <a href="system-settings.html" style="color:var(--primary)">系统设置</a> 填写 API Key');
+          return;
+        }
+
+        if (data.executedTools?.length) {
+          data.executedTools.forEach(t => {
+            appendChatToolCard(t.tool, t.result?.success !== false, t.result);
+            chatToolCalls++;
+          });
+
+          // ── 自动将本次执行结果写入任务中心 ──
+          await createTaskFromChat(message, data);
+        }
+
+        if (data.response) {
+          appendChatBubble('ai', data.response.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/\n/g,'<br>'));
+        } else if (data.error) {
+          appendChatBubble('ai', `❌ 出错了：${data.error}`);
+        }
+        if (data.warning) appendChatBubble('system', '⚠️ ' + data.warning);
+
+        chatRounds += (data.rounds || 0);
+        const rEl = document.getElementById('chat-stat-rounds');
+        const tEl = document.getElementById('chat-stat-tools');
+        if (rEl) rEl.textContent = chatRounds;
+        if (tEl) tEl.textContent = chatToolCalls;
+      } catch(e) {
+        thinkEl.remove();
+        appendChatBubble('ai', `❌ 网络错误：${e.message}`);
+      }
+
+      chatIsThinking = false;
+      document.getElementById('chat-send-btn').disabled = false;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 将 AI 执行结果写入任务中心
+    // ─────────────────────────────────────────────────────────
+    let chatCreatedTasks = 0;
+
+    async function createTaskFromChat(userMessage, data) {
+      try {
+        const taskId = 'ai-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        const tools  = data.executedTools || [];
+
+        // 工具→子任务映射
+        const toolLabel = {
+          get_campaigns:          { title: '查询广告活动', icon: '📊', type: 'query' },
+          get_keywords:           { title: '查询关键词',   icon: '🎯', type: 'query' },
+          update_campaign_budgets:{ title: '调整活动预算', icon: '💰', type: 'update' },
+          pause_campaigns:        { title: '暂停广告活动', icon: '⏸️', type: 'update' },
+          enable_campaigns:       { title: '启用广告活动', icon: '▶️', type: 'update' },
+          adjust_keyword_bids:    { title: '调整关键词出价',icon: '📈', type: 'update' },
+          add_negative_keywords:  { title: '添加否定词',   icon: '🚫', type: 'update' },
+          harvest_keywords:       { title: '关键词收割',   icon: '🌾', type: 'harvest' },
+          apply_smart_bids:       { title: '智能调价(ACOS)',icon: '🤖', type: 'update' },
+          add_asin_targeting:     { title: 'ASIN商品定向', icon: '🏷️', type: 'update' },
+          add_negative_asin_targeting:{ title: 'ASIN否定定向',icon:'🚫',type:'update'}
+        };
+
+        const items = tools.map(t => {
+          const lbl  = toolLabel[t.tool] || { title: t.tool, icon: '🔧', type: 'other' };
+          const ok   = t.result?.success !== false;
+          const desc = buildToolDesc(t);
+          return {
+            title:       lbl.icon + ' ' + lbl.title,
+            description: desc,
+            actionType:  lbl.type,
+            targetType:  'campaign',
+            actionValue: ok ? 'completed' : 'failed'
+          };
+        });
+
+        // 任务名称：取指令前20字
+        const taskName = 'AI: ' + userMessage.slice(0, 40) + (userMessage.length > 40 ? '…' : '');
+
+        await fetch(`${CHAT_API}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: taskId,
+            name: taskName,
+            description: data.response?.slice(0, 200) || '',
+            source: 'ai_command',
+            priority: 'medium',
+            items
+          })
+        });
+
+        chatCreatedTasks++;
+        const tEl = document.getElementById('chat-stat-tasks');
+        if (tEl) tEl.textContent = chatCreatedTasks;
+
+        // 显示"查看任务中心"按钮
+        const goEl = document.getElementById('chat-goto-tasks');
+        if (goEl) goEl.style.display = 'block';
+
+        appendChatBubble('system', `✅ 已记录到任务中心 · <a href="ai-tasks.html" style="color:var(--primary);font-weight:600;">查看 →</a>`);
+      } catch(e) {
+        console.warn('[createTaskFromChat]', e.message);
+      }
+    }
+
+    function buildToolDesc(t) {
+      const r = t.result;
+      if (!r) return t.tool;
+      if (!r.success) return '失败：' + (r.error || r.message || '未知错误');
+      switch (t.tool) {
+        case 'get_campaigns': return `找到 ${r.count} 个广告活动`;
+        case 'get_keywords':  return `找到 ${r.count} 个关键词`;
+        case 'update_campaign_budgets': return `更新 ${r.updated} 个预算`;
+        case 'pause_campaigns':  return `暂停 ${r.paused} 个活动`;
+        case 'enable_campaigns': return `启用 ${r.enabled} 个活动`;
+        case 'adjust_keyword_bids': return `调整 ${r.adjusted} 个出价`;
+        case 'add_negative_keywords': return `添加 ${r.added} 个否定词`;
+        case 'harvest_keywords': return r.dryRun
+          ? `预览：可收割 ${r.summary?.harvestCount} 词，否定 ${r.summary?.negateCount} 词`
+          : `收割 ${r.summary?.harvestCount} 词，否定 ${r.summary?.negateCount} 词`;
+        case 'apply_smart_bids': return r.dryRun
+          ? `预览：${r.suggestions?.length} 个词需调价`
+          : `已调整 ${r.updated} 个词出价`;
+        default: return JSON.stringify(r).slice(0, 80);
+      }
+    }
+
+    // 快捷填入输入框
+    function setChatInput(text) {
+      const el = document.getElementById('chat-input');
+      if (el) { el.value = text; el.focus(); autoResizeChat(el); }
+    }
+
+    // 安全模式切换
+    function toggleSafeMode() {
+      chatSafeMode = !chatSafeMode;
+      const tog = document.getElementById('chat-toggle-ui');
+      const lbl = document.getElementById('chat-safe-label');
+      if (tog) tog.classList.toggle('on', chatSafeMode);
+      if (lbl) lbl.textContent = chatSafeMode ? '安全模式 开' : '安全模式 关';
+    }
+
+    // 清除会话
+    function chatClearSession() {
+      chatSessionId = 'sess-' + Math.random().toString(36).slice(2, 10);
+      chatRounds = 0; chatToolCalls = 0;
+      const msgs = document.getElementById('chat-messages');
+      if (msgs) msgs.innerHTML = '<div class="chat-bubble system">🔄 会话已重置</div>';
+      const rEl = document.getElementById('chat-stat-rounds');
+      const tEl = document.getElementById('chat-stat-tools');
+      if (rEl) rEl.textContent = '0';
+      if (tEl) tEl.textContent = '0';
+    }
+
+
+
+    // ─────────────────────────────────────────────────────────────────
+    // 关键词收割功能（来自 keyword-harvest.html）
+    // ─────────────────────────────────────────────────────────────────
+    const HV_API = 'http://localhost:3000/api';
+    let hvData = { harvest:[], negate:[], info:[] };
+    let hvCurrentTab = 'harvest';
+    let hvPending = null;
+
+    (function initHvDates() {
+      const t = new Date();
+      const fmt = d => d.toISOString().slice(0,10);
+      document.getElementById('hv-endDate').value = fmt(new Date(t - 86400000));
+      document.getElementById('hv-startDate').value = fmt(new Date(t - 30*86400000));
+    })();
+
+    function hvAcosClass(v) {
+      if (v == null) return 'harvest-acos-bad';
+      if (v <= 25) return 'harvest-acos-ok';
+      if (v <= 50) return 'harvest-acos-warn';
+      return 'harvest-acos-bad';
+    }
+
+    function hvGetSelected(type) {
+      return [...document.querySelectorAll(`.hv-chk-${type}:checked`)].map(c => +c.dataset.idx);
+    }
+    function hvUpdateSelCount(type) {
+      const n = hvGetSelected(type).length;
+      document.getElementById(`hv-sel-${type}`).textContent = n;
+      document.getElementById(`hv-btn-exec-${type}`).disabled = n === 0;
+    }
+    function hvSelectAll(type) {
+      document.querySelectorAll(`.hv-chk-${type}`).forEach(c => c.checked = true);
+      hvUpdateSelCount(type);
+    }
+    function hvClearSel(type) {
+      document.querySelectorAll(`.hv-chk-${type}`).forEach(c => c.checked = false);
+      hvUpdateSelCount(type);
+    }
+
+    function hvSetLoading(on, msg) {
+      const btn = document.getElementById('hv-btn-analyze');
+      btn.disabled = on;
+      btn.textContent = on ? '⏳ 处理中…' : '🔍 分析';
+      if (on && msg) document.getElementById('hv-alert-area').innerHTML = `<div class="harvest-alert harvest-alert-info"><div class="harvest-spinner"></div>${msg}</div>`;
+    }
+
+    function hvShowAlert(msg, type) {
+      document.getElementById('hv-alert-area').innerHTML = `<div class="harvest-alert harvest-alert-${type}">${msg}</div>`;
+    }
+
+    function hvLoadDemo() {
+      hvData = {
+        harvest: [
+          { searchTerm:'wireless earbuds', matchType:'AUTO', campaignName:'SP-Auto-01', clicks:45, orders:5, spend:28.50, sales:225, acos:12.7, cvr:11.1, suggestedBid:0.83, reason:'5单 / ACoS 12.7% — 建议精准收割' },
+          { searchTerm:'bluetooth headphones noise cancelling', matchType:'AUTO', campaignName:'SP-Auto-01', clicks:32, orders:3, spend:22.10, sales:150, acos:14.7, cvr:9.4, suggestedBid:0.70, reason:'3单 / ACoS 14.7% — 建议精准收割' },
+          { searchTerm:'running earphones waterproof', matchType:'AUTO', campaignName:'SP-Auto-02', clicks:28, orders:4, spend:19.60, sales:180, acos:10.9, cvr:14.3, suggestedBid:1.07, reason:'4单 / ACoS 10.9% — 建议精准收割' },
+          { searchTerm:'sport earbuds gym', matchType:'AUTO', campaignName:'SP-Auto-02', clicks:19, orders:2, spend:15.20, sales:90, acos:16.9, cvr:10.5, suggestedBid:0.79, reason:'2单 / ACoS 16.9% — 建议精准收割' },
+        ],
+        negate: [
+          { searchTerm:'cheap earbuds under 10', campaignName:'SP-Auto-01', clicks:38, orders:0, spend:31.20, acos:null, reason:'38次点击无转化，消耗$31.20，建议否定' },
+          { searchTerm:'wired headphone', campaignName:'SP-Auto-01', clicks:22, orders:1, spend:19.80, acos:247.5, reason:'ACoS 247.5% 超过阈值，建议否定' },
+          { searchTerm:'kids headphone', campaignName:'SP-Auto-02', clicks:16, orders:0, spend:13.60, acos:null, reason:'16次点击无转化，建议否定' },
+        ],
+        info: [
+          { searchTerm:'earbuds for small ears', clicks:8, orders:0, spend:6.80, acos:null },
+          { searchTerm:'bluetooth earphones android', clicks:7, orders:1, spend:5.60, acos:56.0 },
+        ],
+        summary: { total:120, harvestCount:4, negateCount:3, infoCount:2 }
+      };
+      hvRenderStats(hvData.summary);
+      hvSwitchTab('harvest');
+      hvShowAlert('已加载示例数据（非真实账户数据）', 'info');
+    }
+
+    function hvRenderStats(s) {
+      document.getElementById('hv-stats-area').style.display = 'grid';
+      document.getElementById('hv-result-area').style.display = 'block';
+      document.getElementById('hv-stat-total').textContent   = s.total;
+      document.getElementById('hv-stat-harvest').textContent = s.harvestCount;
+      document.getElementById('hv-stat-negate').textContent  = s.negateCount;
+      document.getElementById('hv-stat-info').textContent    = s.infoCount;
+      document.getElementById('hv-tab-harvest-cnt').textContent = `(${s.harvestCount})`;
+      document.getElementById('hv-tab-negate-cnt').textContent = `(${s.negateCount})`;
+      document.getElementById('hv-tab-info-cnt').textContent   = `(${s.infoCount})`;
+    }
+
+    function hvSwitchTab(tab) {
+      hvCurrentTab = tab;
+      document.querySelectorAll('.harvest-tab').forEach((t,i) => t.classList.toggle('active', ['harvest','negate','info'][i] === tab));
+      ['harvest','negate','info'].forEach(t => {
+        document.getElementById(`hv-action-bar-${t}`).style.display = t === tab ? 'flex' : 'none';
+      });
+      if (tab === 'harvest') hvRenderHarvestTable();
+      else if (tab === 'negate') hvRenderNegateTable();
+      else hvRenderInfoTable();
+    }
+
+    function hvRenderHarvestTable() {
+      document.getElementById('hv-table-head').innerHTML = `<tr><th style="width:32px"><input type="checkbox" id="hv-chk-all-harvest" onchange="hvToggleAll('harvest',this.checked)"></th><th>搜索词</th><th>来源活动</th><th>点击</th><th>订单</th><th>花费</th><th>ACoS</th><th>CVR</th><th>建议出价</th><th>说明</th></tr>`;
+      const rows = hvData.harvest.map((r,i) => `<tr>
+        <td><input type="checkbox" class="hv-chk-harvest" data-idx="${i}" onchange="hvUpdateSelCount('harvest')"></td>
+        <td><span class="harvest-kw">${r.searchTerm}</span><br><span class="harvest-match-tag harvest-match-${r.matchType}">${r.matchType}</span></td>
+        <td style="font-size:12px;color:var(--text-secondary)">${r.campaignName}</td>
+        <td>${r.clicks}</td><td><strong>${r.orders}</strong></td>
+        <td>$${r.spend}</td>
+        <td class="${hvAcosClass(r.acos)}">${r.acos}%</td>
+        <td>${r.cvr}%</td>
+        <td class="harvest-bid-suggest">$${r.suggestedBid}</td>
+        <td class="harvest-reason">${r.reason}</td>
+      </tr>`).join('');
+      document.getElementById('hv-table-body').innerHTML = rows || '<tr><td colspan="10" class="harvest-empty">暂无可收割词</td></tr>';
+    }
+
+    function hvRenderNegateTable() {
+      document.getElementById('hv-table-head').innerHTML = `<tr><th style="width:32px"><input type="checkbox" id="hv-chk-all-negate" onchange="hvToggleAll('negate',this.checked)"></th><th>搜索词</th><th>来源活动</th><th>点击</th><th>订单</th><th>花费</th><th>ACoS</th><th>说明</th></tr>`;
+      const rows = hvData.negate.map((r,i) => `<tr>
+        <td><input type="checkbox" class="hv-chk-negate" data-idx="${i}" onchange="hvUpdateSelCount('negate')"></td>
+        <td><span class="harvest-kw">${r.searchTerm}</span></td>
+        <td style="font-size:12px;color:var(--text-secondary)">${r.campaignName}</td>
+        <td>${r.clicks}</td><td>${r.orders}</td>
+        <td>$${r.spend}</td>
+        <td class="${hvAcosClass(r.acos)}">${r.acos != null ? r.acos+'%' : '∞'}</td>
+        <td class="harvest-reason">${r.reason}</td>
+      </tr>`).join('');
+      document.getElementById('hv-table-body').innerHTML = rows || '<tr><td colspan="8" class="harvest-empty">暂无建议否定词</td></tr>';
+    }
+
+    function hvRenderInfoTable() {
+      document.getElementById('hv-table-head').innerHTML = `<tr><th>搜索词</th><th>点击</th><th>订单</th><th>花费</th><th>ACoS</th></tr>`;
+      const rows = hvData.info.map(r => `<tr>
+        <td><span class="harvest-kw">${r.searchTerm}</span></td>
+        <td>${r.clicks}</td><td>${r.orders}</td>
+        <td>$${r.spend}</td>
+        <td class="${hvAcosClass(r.acos)}">${r.acos != null ? r.acos+'%' : '—'}</td>
+      </tr>`).join('');
+      document.getElementById('hv-table-body').innerHTML = rows || '<tr><td colspan="5" class="harvest-empty">暂无观察词</td></tr>';
+    }
+
+    function hvToggleAll(type, checked) {
+      document.querySelectorAll(`.hv-chk-${type}`).forEach(c => c.checked = checked);
+      hvUpdateSelCount(type);
+    }
+
+    async function hvRunAnalyze() {
+      const profileId = document.getElementById('hv-profileId').value.trim();
+      if (!profileId) { hvShowAlert('请填写 Profile ID', 'warning'); return; }
+      hvSetLoading(true, '正在拉取搜索词报告…');
+      try {
+        const params = new URLSearchParams({ profileId, startDate: document.getElementById('hv-startDate').value, endDate: document.getElementById('hv-endDate').value });
+        const reportRes = await fetch(`${HV_API}/amazon/search-terms?${params}`);
+        const reportJson = await reportRes.json();
+        if (!reportJson.success) throw new Error(reportJson.message);
+
+        const r = await fetch(`${HV_API}/amazon/harvest/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ searchTerms: reportJson.data, rules: { targetAcos: +document.getElementById('hv-targetAcos').value, avgOrderValue: +document.getElementById('hv-avgOrderValue').value, harvestMinOrders: +document.getElementById('hv-harvestMinOrders').value, negateNoConvClicks: +document.getElementById('hv-negateNoConvClicks').value } })
+        }).then(res => res.json());
+
+        hvData = r;
+        hvRenderStats(r.summary);
+        hvSwitchTab('harvest');
+        hvSetLoading(false);
+        hvShowAlert(`分析完成！可收割 ${r.summary.harvestCount} 个词，建议否定 ${r.summary.negateCount} 个词`, 'success');
+      } catch(e) {
+        hvSetLoading(false);
+        hvShowAlert('分析失败：' + e.message, 'danger');
+      }
+    }
+
+    function hvConfirmExec(type) {
+      const idxs = hvGetSelected(type);
+      if (!idxs.length) return;
+      hvPending = { type, items: idxs.map(i => hvData[type][i]) };
+      const isHarvest = type === 'harvest';
+      document.getElementById('hv-dlg-title').textContent = isHarvest ? '确认精准收割' : '确认添加否定词';
+      document.getElementById('hv-dlg-body').innerHTML = isHarvest
+        ? `将把 <strong>${hvPending.items.length}</strong> 个词以精准匹配创建为手动关键词：<br><br>${hvPending.items.map(k => `・${k.searchTerm}（建议出价 $${k.suggestedBid}）`).join('<br>')}<br><br>⚠️ 操作完成后无法自动撤销`
+        : `将把 <strong>${hvPending.items.length}</strong> 个词添加为否定精准：<br><br>${hvPending.items.map(k => `・${k.searchTerm}`).join('<br>')}<br><br>⚠️ 否定词添加后需手动删除`;
+      document.getElementById('hv-confirm-overlay').classList.add('show');
+    }
+
+    function hvCloseDialog() {
+      document.getElementById('hv-confirm-overlay').classList.remove('show');
+      hvPending = null;
+    }
+
+    async function hvExecute() {
+      if (!hvPending) return;
+      hvCloseDialog();
+      const profileId = document.getElementById('hv-profileId').value.trim();
+      if (!profileId) { hvShowAlert('请先填写 Profile ID', 'warning'); return; }
+      hvSetLoading(true, '正在执行…');
+      try {
+        const body = { profileId, harvest: hvPending.type === 'harvest' ? hvPending.items : [], negate: hvPending.type === 'negate' ? hvPending.items : [] };
+        const res = await fetch(`${HV_API}/amazon/harvest/execute`, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+        if (!res.success) throw new Error(res.message);
+        hvSetLoading(false);
+        hvShowAlert(hvPending.type === 'harvest' ? `✅ 成功创建 ${res.harvestCount} 个精准关键词！` : `✅ 成功添加 ${res.negateCount} 个否定词！`, 'success');
+      } catch(e) {
+        hvSetLoading(false);
+        hvShowAlert('执行失败：' + e.message, 'danger');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  关键词管理
+    // ═══════════════════════════════════════════════════════════════
+
+    const KW_API = 'http://localhost:3000/api/keywords';
+
+    // 加载标签概览
+    async function loadKeywordTags() {
+      const container = document.getElementById('kw-tags-overview');
+      if (!container) return;
+      try {
+        const res = await fetch(KW_API + '/tags');
+        const data = await res.json();
+        if (!data.success) return;
+        const tags = data.tags;
+        container.innerHTML = tags.map(tag => `
+          <div class="kw-tag-card ${tag.has_protection ? 'has-protection' : ''}"
+               onclick="document.getElementById('kw-tag-filter').value='${tag.id}';loadKeywords();">
+            <div class="kw-tag-dot" style="background:${tag.color}"></div>
+            <div>
+              <div class="kw-tag-name">${tag.name}</div>
+              <div class="kw-tag-count">${tag.keyword_count || 0} 个关键词</div>
+            </div>
+            <div class="kw-tag-shield" title="${tag.has_protection ? '已设置保护规则' : '无保护规则'}">
+              ${tag.has_protection ? '🛡️' : '⚪'}
+            </div>
+          </div>
+        `).join('');
+      } catch(e) {
+        console.log('加载标签失败:', e);
+      }
+    }
+
+    // 加载关键词列表
+    async function loadKeywords() {
+      const container = document.getElementById('kw-list');
+      if (!container) return;
+
+      container.innerHTML = `
+        <div class="kw-loading">
+          <div class="spinner"></div>
+          <span>加载中...</span>
+        </div>`;
+
+      const storeId = document.getElementById('kw-store-filter')?.value || '';
+      const tagId = document.getElementById('kw-tag-filter')?.value || '';
+      const search = document.getElementById('kw-search')?.value || '';
+
+      try {
+        const params = new URLSearchParams();
+        if (storeId) params.set('store_id', storeId);
+        if (tagId) params.set('tag_id', tagId);
+        if (search) params.set('search', search);
+
+        const res = await fetch(KW_API + '/list?' + params.toString());
+        const data = await res.json();
+
+        if (!data.success || !data.keywords.length) {
+          container.innerHTML = `
+            <div class="kw-empty">
+              <div class="kw-empty-icon">🔍</div>
+              <div>暂无关键词数据</div>
+              <div style="font-size:12px;margin-top:8px">点击「批量打标签」添加关键词</div>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="kw-list-header">
+            <div><input type="checkbox" class="kw-check" id="kw-check-all" onchange="toggleAllKws(this)"></div>
+            <div>关键词</div>
+            <div>出价</div>
+            <div>ACOS</div>
+            <div>点击</div>
+            <div title="🛡️ 关键词保护&#10;&#10;启用后，该关键词出价将被锁定，&#10;自动优化规则不会对其降价或暂停。&#10;&#10;适用场景：&#10;• 核心战略词 — 保持曝光，不受ACOS波动影响&#10;• 品牌词 / 高转化词 — 防止误降价&#10;• 活动期间重点词 — 锁定投放&#10;&#10;点击行末「🛡️」按钮可开启/关闭保护。" style="cursor:help;text-decoration:underline dotted #9ca3af">保护</div>
+            <div>标签</div>
+            <div>操作</div>
+          </div>
+          ${data.keywords.map(kw => renderKeywordRow(kw)).join('')}
+        `;
+      } catch(e) {
+        container.innerHTML = `<div class="kw-empty">⚠️ 加载失败: ${e.message}</div>`;
+      }
+    }
+
+    function renderKeywordRow(kw) {
+      const acos = Number(kw.acos || 0);
+      const acosClass = acos === 0 ? '' : acos < 15 ? 'good' : acos < 30 ? 'warn' : 'bad';
+      const acosText = acos === 0 ? '—' : acos.toFixed(1) + '%';
+      const isProtected = kw.is_protected;
+      const primaryTag = kw.tags && kw.tags[0];
+
+      return `
+        <div class="kw-item ${isProtected ? 'protected' : ''}" data-kw-id="${kw.keyword_id}">
+          <div><input type="checkbox" class="kw-check kw-check-item" value="${kw.keyword_id}"></div>
+          <div class="kw-text" title="${kw.keyword_text}">${escapeHtml(kw.keyword_text || '')}</div>
+          <div class="kw-bid">$${(kw.bid || 0).toFixed(2)}</div>
+          <div class="kw-acos ${acosClass}">${acosText}</div>
+          <div style="font-size:13px;color:#6b7280">${kw.clicks || 0}</div>
+          <div class="kw-status ${isProtected ? 'protected' : ''}">${isProtected ? '已保护' : '—'}</div>
+          <div>
+            ${primaryTag ? `<span class="kw-tag-badge" style="background:${primaryTag.color}22;color:${primaryTag.color}">${primaryTag.name}</span>` : '<span style="font-size:12px;color:#9ca3af">未标签</span>'}
+          </div>
+          <div class="kw-actions">
+            <button class="kw-btn kw-btn-tag" onclick="openTagModal('${kw.keyword_id}')">标签</button>
+            ${kw.is_protected ? `<button class="kw-btn kw-btn-shield" onclick="removeKeywordProtection('${kw.keyword_id}')" title="移除保护">🛡️</button>` : `<button class="kw-btn kw-btn-tag" onclick="addKeywordProtection('${kw.keyword_id}')" title="添加保护">添加保护</button>`}
+          </div>
+        </div>`;
+    }
+
+    function toggleAllKws(cb) {
+      document.querySelectorAll('.kw-check-item').forEach(c => c.checked = cb.checked);
+    }
+
+    // 单个打标签
+    async function openTagModal(keywordId) {
+      const { value: tagId } = await Swal.fire({
+        title: '选择标签', input: 'select',
+        inputOptions: {
+          TAG001: '🌟 战略词 — 重点保护，长周期评估',
+          TAG002: '💎 利润词 — 高ROAS，稳定投放',
+          TAG003: '📈 成长词 — 有潜力，持续观察',
+          TAG004: '⚡ 测试词 — 效果待验证',
+          TAG005: '🔴 待优化 — 效果较差'
+        },
+        inputPlaceholder: '选择标签...', showCancelButton: true
+      });
+      if (!tagId) return;
+      try {
+        const res = await fetch(KW_API + '/tag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword_id: keywordId, tag_id: tagId, keyword_text: keywordId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('标签设置成功！', 'success');
+          loadKeywords();
+          loadKeywordTags();
+        } else {
+          showToast('设置失败', 'error');
+        }
+      } catch(e) {
+        showToast('网络错误', 'error');
+      }
+    }
+
+    // 批量打标签
+    async function openBatchTagModal() {
+      const checked = [...document.querySelectorAll('.kw-check-item:checked')].map(c => c.value);
+      if (!checked.length) {
+        showToast('请先选择关键词', 'warning');
+        return;
+      }
+      const { value: tagId } = await Swal.fire({
+        title: `批量打标签 (已选${checked.length}个)`,
+        input: 'select',
+        inputOptions: {
+          TAG001: '🌟 战略词',
+          TAG002: '💎 利润词',
+          TAG003: '📈 成长词',
+          TAG004: '⚡ 测试词',
+          TAG005: '🔴 待优化'
+        },
+        inputPlaceholder: '选择标签...', showCancelButton: true
+      });
+      if (!tagId) return;
+      try {
+        const res = await fetch(KW_API + '/tag/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword_ids: checked, tag_id: tagId })
+        });
+        const data = await res.json();
+        showToast(data.success ? `成功设置 ${checked.length} 个关键词！` : '设置失败', data.success ? 'success' : 'error');
+        loadKeywords();
+        loadKeywordTags();
+      } catch(e) {
+        showToast('网络错误', 'error');
+      }
+    }
+
+    // 添加/移除保护
+    async function addKeywordProtection(keywordId) {
+      try {
+        const res = await fetch(KW_API + '/protection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword_id: keywordId, keyword_text: keywordId })
+        });
+        const data = await res.json();
+        showToast(data.success ? '🛡️ 已添加保护' : '设置失败', data.success ? 'success' : 'error');
+        loadKeywords();
+      } catch(e) { showToast('网络错误', 'error'); }
+    }
+
+    async function removeKeywordProtection(keywordId) {
+      try {
+        const res = await fetch(KW_API + '/protection/' + encodeURIComponent(keywordId), { method: 'DELETE' });
+        const data = await res.json();
+        showToast(data.success ? '已移除保护' : '移除失败', data.success ? 'success' : 'error');
+        loadKeywords();
+      } catch(e) { showToast('网络错误', 'error'); }
+    }
+
+    function showToast(message, type = 'success') {
+      const t = document.createElement('div');
+      t.style.cssText = `position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:500;z-index:9999;background:${type==='success'?'#10b981':type==='error'?'#ef4444':'#f59e0b'};color:#fff;animation:slideIn .3s ease`;
+      t.textContent = message;
+      document.body.appendChild(t);
+      setTimeout(() => { t.style.animation = 'slideIn .3s ease reverse'; setTimeout(() => t.remove(), 300); }, 2500);
+    }
+  </script>
+  <script src="components/sidebar.js"></script>
+</body>
+</html>
