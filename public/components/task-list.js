@@ -182,7 +182,6 @@ function renderTaskList(tasks, containerId, options) {
             <h4 class="task-name">${escapeHtml(task.name)}</h4>
             <p class="task-desc">${escapeHtml(task.description || '无描述')}</p>
           </div>
-          ${getStatusBadge(task.status)}
         </div>
         <div class="task-card-meta">
           <span class="task-progress">
@@ -198,14 +197,15 @@ function renderTaskList(tasks, containerId, options) {
         ` : ''}
       </div>
       <div class="task-card-actions">
+        ${getStatusBadge(task.status)}
         <button class="task-btn view-btn" onclick="${onView ? onView + "('" + task.id + "')" : "viewTaskDetail('" + task.id + "')"}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-          查看详情
+          查看
         </button>
         ${task.status === 'pending' || task.status === 'in_progress' ? `
           <button class="task-btn cancel-btn" onclick="${onCancel ? onCancel + "('" + task.id + "')" : "cancelTaskConfirm('" + task.id + "')"}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-            取消任务
+            取消
           </button>
         ` : ''}
       </div>

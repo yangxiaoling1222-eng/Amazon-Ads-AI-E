@@ -26,9 +26,9 @@
       color: var(--text-primary);
       min-height: 100vh;
     }
-    .layout { min-height: 100vh; }
+    .layout { display: flex; min-height: 100vh; }
     /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
-    .main { margin-left: 260px; padding: 24px; overflow-y: auto; min-height: 100vh; }
+    .main { flex: 1; margin-left: 260px; padding: 24px; overflow-y: auto; min-height: 100vh; }
     .page-header {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
     }
@@ -233,14 +233,18 @@
     // 加载日志统计数据
     async function loadStats() {
       try {
-        const res = await fetch('/api/config/logs/stats');
+        const res = await fetch('/api/logs/stats');
         const json = await res.json();
         if (json.success) {
           const stats = json.data;
+          // 按 operation_type 分组统计
+          const byType = stats.byType || [];
+          const getCount = (types) => byType.filter(t => types.includes(t.operation_type)).reduce((s, t) => s + t.count, 0);
+
           document.querySelector('.stat-card:nth-child(1) .value').textContent = stats.todayCount || 0;
-          document.querySelector('.stat-card:nth-child(2) .value').textContent = stats.weekCount || 0;
-          document.querySelector('.stat-card:nth-child(3) .value').textContent = stats.monthCount || 0;
-          document.querySelector('.stat-card:nth-child(4) .value').textContent = stats.totalCount || 0;
+          document.querySelector('.stat-card:nth-child(2) .value').textContent = getCount(['AI查询', '添加否定词', '调整竞价', '启动活动', '添加关键词保护', '批量添加标签', '创建调度任务', '恢复调度任务', '手动触发任务', '更新调价规则', '更新分时出价配置', '执行调价周期', '预览调价结果', '保存配置', '测试连接']);
+          document.querySelector('.stat-card:nth-child(3) .value').textContent = getCount(['暂停活动', '移除关键词保护', '暂停调度任务', '删除调度任务']);
+          document.querySelector('.stat-card:nth-child(4) .value').textContent = getCount(['错误']);
         }
       } catch (e) {
         console.error('加载统计数据失败:', e);
@@ -250,7 +254,7 @@
     // 加载日志列表
     async function loadLogs(page = 1) {
       try {
-        const res = await fetch(`/api/config/logs?limit=${pageSize}&page=${page}`);
+        const res = await fetch(`/api/logs?limit=${pageSize}&page=${page}`);
         const json = await res.json();
         if (json.success) {
           logs = json.data.map(item => ({

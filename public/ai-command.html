@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI指令中心 - 亚马逊广告AI专家</title>
+  <!-- SheetJS 库 - 延迟加载，不阻塞页面渲染 -->
+  <link rel="preconnect" href="https://cdn.sheetjs.com">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" defer></script>
   <link rel="stylesheet" href="components/task-list.css">
   <style>
     :root {
@@ -27,20 +30,180 @@
       background: var(--bg-dark);
       color: var(--text-primary);
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
-    .layout { min-height: 100vh; }
+    .layout {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+    }
 
     /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
 
     /* 主内容区 - 左侧留出侧边栏宽度 */
     .main {
+      flex: 1;
       margin-left: 260px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
       min-height: 100vh;
       height: 100vh;
+      /* 右侧留出账户面板宽度 */
+      margin-right: 240px;
+    }
+
+    /* ============ 右侧账户面板 ============ */
+    .right-panel {
+      width: 240px;
+      min-width: 240px;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: fixed;
+      right: 0;
+      top: 0;
+      height: 100vh;
+      z-index: 50;
+    }
+    .right-panel-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-primary);
+    }
+    .right-panel-header .sync-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .right-panel-header .sync-btn:hover {
+      background: var(--bg-input);
+      color: var(--primary);
+    }
+    .right-panel-header .sync-btn.spinning {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .account-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .account-group {
+      margin-bottom: 12px;
+    }
+    .account-group-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 8px;
+      margin-bottom: 4px;
+    }
+    .account-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+      margin-bottom: 4px;
+    }
+    .account-item:hover {
+      background: var(--bg-input);
+    }
+    .account-item.active {
+      background: linear-gradient(135deg, #f0f4ff 0%, #f8f5ff 100%);
+      border-color: var(--primary);
+    }
+    .account-item .account-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .account-item .account-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .account-item .account-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .account-item .account-meta {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .account-item .account-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #d1d5db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .account-item.active .account-check {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    .account-item.active .account-check::after {
+      content: '✓';
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .account-empty {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .account-empty .empty-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+      opacity: 0.5;
+    }
+    .account-context {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--bg-input);
+    }
+    .account-context strong {
+      color: var(--text-primary);
     }
 
     .header {
@@ -215,6 +378,113 @@
     .message-text th {
       background: var(--bg-input);
     }
+
+    /* ============ 任务卡片样式 ============ */
+    .task-card {
+      background: linear-gradient(135deg, #f0f4ff 0%, #f8f5ff 100%);
+      border: 1px solid #c7d2fe;
+      border-radius: 12px;
+      padding: 16px;
+      max-width: 420px;
+    }
+    .task-card.loading {
+      opacity: 0.7;
+    }
+    .task-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .task-card-icon { font-size: 18px; }
+    .task-card-title {
+      font-weight: 600;
+      font-size: 15px;
+      color: #1e1b4b;
+      flex: 1;
+    }
+    .task-card-status {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 500;
+    }
+    .task-card-status.pending { background: #fef3c7; color: #92400e; }
+    .task-card-status.in_progress { background: #dbeafe; color: #1e40af; }
+    .task-card-status.completed { background: #d1fae5; color: #065f46; }
+    .task-card-status.cancelled { background: #fee2e2; color: #991b1b; }
+    .task-card-desc {
+      font-size: 13px;
+      color: #4b5563;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .task-card-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .task-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .task-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .task-progress-text {
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    .task-card-items {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .task-item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #374151;
+    }
+    .task-item-row.completed { color: #059669; }
+    .task-item-row.completed .task-item-dot { background: #10b981; }
+    .task-item-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #9ca3af;
+      flex-shrink: 0;
+    }
+    .task-item-more {
+      font-size: 12px;
+      color: #9ca3af;
+      padding-left: 14px;
+    }
+    .task-card-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .task-card-btn {
+      font-size: 13px;
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(102,126,234,0.08);
+      transition: background 0.2s;
+    }
+    .task-card-btn:hover { background: rgba(102,126,234,0.15); }
 
     /* 输入区域 */
     .input-area {
@@ -539,6 +809,7 @@
       .message-content { max-width: 90%; }
       .quick-commands { gap: 8px; }
       .quick-cmd { padding: 6px 12px; font-size: 12px; }
+      .right-panel { display: none; }
     }
   </style>
 </head>
@@ -552,7 +823,12 @@
       <!-- 固定顶部区域 -->
       <div class="fixed-header">
         <div class="header">
-          <h2>AI指令中心</h2>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <h2>AI指令中心</h2>
+            <button onclick="startNewConversation()" class="quick-cmd" title="开始新对话" style="font-size: 12px; padding: 6px 12px;">
+              ➕ 新对话
+            </button>
+          </div>
         </div>
 
         <!-- 历史记录面板 -->
@@ -568,15 +844,8 @@
 
         <!-- 工具栏 -->
         <div class="toolbar" style="padding: 16px 24px; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
-          <div class="filter-group">
-            <label>店铺筛选：</label>
-            <select id="storeFilter" onchange="onStoreChange()">
-              <option value="">全部店铺</option>
-              <option value="store_us">美国站 - Amazon.com</option>
-              <option value="store_uk">英国站 - Amazon.co.uk</option>
-              <option value="store_de">德国站 - Amazon.de</option>
-              <option value="store_jp">日本站 - Amazon.co.jp</option>
-            </select>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="currentStoreLabel" style="font-size: 13px; color: var(--text-secondary);">📍 未选择店铺</span>
           </div>
           <div class="toolbar-actions" style="display: flex; gap: 8px;">
             <button class="toolbar-btn" onclick="openHistoryPanel()" title="历史记录">
@@ -654,34 +923,94 @@
         </div>
       </div>
     </main>
+
+    <!-- 右侧账户/店铺面板 -->
+    <aside class="right-panel" id="rightPanel">
+      <div class="right-panel-header">
+        🏪 店铺账户
+        <button class="sync-btn" id="syncStoresBtn" onclick="syncStores()" title="同步店铺">
+          🔄
+        </button>
+      </div>
+      <div class="account-list" id="accountList">
+        <div class="account-empty">
+          <div class="empty-icon">⏳</div>
+          正在加载店铺...
+        </div>
+      </div>
+      <div class="account-context" id="accountContext" style="display: none;">
+        已选择: <strong id="selectedAccountName">--</strong>
+      </div>
+    </aside>
   </div>
 
   <script>
-    const API_BASE = '/api';
-    let messages = [];
+    // 不重新定义 API_BASE（task-list.js 已定义），使用独立变量名
+    // 等待 DOM 完全加载后再调用 taskList（task-list.js 在底部引入）
+    const AI_API_BASE = '/api'; // AI 相关 API 基础路径
+    let messages = []; // 多轮对话历史
     let isTyping = false;
     let currentStoreId = '';
     let uploadedFiles = []; // 存储已上传的文件内容
     let lastAiResponse = ''; // 用于去重，记录上一次AI回复
+    let conversationId = null; // 当前会话 ID（用于多轮对话）
+    const MAX_HISTORY = 20; // 最多保留 20 轮对话历史
 
-    // 初始化
+    // 初始化 - 延迟执行确保 task-list.js 已加载
     document.addEventListener('DOMContentLoaded', async function() {
       document.getElementById('messageInput').focus();
       // 显示当前使用的模型
       showCurrentModel();
-      // 加载任务统计
-      taskList.loadStats();
+      // 加载任务统计 - 延迟 100ms 确保 taskList 已初始化
+      setTimeout(() => {
+        if (window.taskList) {
+          window.taskList.loadStats();
+        }
+      }, 100);
+      // 加载店铺列表
+      loadStores();
     });
 
-    // 显示当前使用的模型（从系统设置读取）
-    function showCurrentModel() {
+    // 显示当前使用的模型（从后端 API 读取，优先级：SiliconFlow > OpenRouter > OpenAI）
+    async function showCurrentModel() {
       const modelInfo = document.getElementById('modelInfo');
       const modelName = document.getElementById('currentModelName');
 
       try {
+        // 从后端 API 读取（数据库是权威数据源）
+        const response = await fetch('/api/agent/config');
+        const result = await response.json();
+        
+        if (result.success && result.data.configured) {
+          const model = result.data.model || 'unknown';
+          const provider = result.data.provider || 'unknown';
+          modelName.textContent = '🤖 ' + model;
+          modelInfo.title = '当前 Provider: ' + provider;
+          modelInfo.style.display = 'flex';
+          
+          // 同步更新 localStorage（保持一致性）
+          const localConfig = JSON.parse(localStorage.getItem('apiConfig') || '{}');
+          if (provider === 'SiliconFlow') {
+            localConfig.siliconflow = localConfig.siliconflow || {};
+            localConfig.siliconflow.model = model;
+          } else if (provider === 'OpenRouter') {
+            localConfig.openrouter = localConfig.openrouter || {};
+            localConfig.openrouter.model = model;
+          }
+          localStorage.setItem('apiConfig', JSON.stringify(localConfig));
+          return;
+        }
+      } catch (e) {
+        console.log('从后端读取模型配置失败，使用本地存储');
+      }
+      
+      // 降级：从 localStorage 读取
+      try {
         const config = JSON.parse(localStorage.getItem('apiConfig') || '{}');
-        const model = config.openrouter?.model || 'openai/gpt-4o';
+        const model = config.siliconflow?.model || config.openrouter?.model || config.openai?.model || 'openai/gpt-4o';
+        const provider = config.siliconflow?.model ? 'SiliconFlow' : (config.openrouter?.model ? 'OpenRouter' : 'OpenAI');
         modelName.textContent = '🤖 ' + model;
+        modelInfo.title = '当前 Provider: ' + provider;
         modelInfo.style.display = 'flex';
       } catch (e) {
         modelName.textContent = '🤖 openai/gpt-4o';
@@ -689,34 +1018,171 @@
       }
     }
 
-    // 获取当前模型（从系统设置读取）
-    function getCurrentModel() {
+    // 获取当前模型（从后端 API 读取）
+    async function getCurrentModel() {
+      try {
+        const response = await fetch('/api/agent/config');
+        const result = await response.json();
+        if (result.success && result.data.model) {
+          return result.data.model;
+        }
+      } catch (e) {
+        console.log('从后端读取模型失败，使用本地存储');
+      }
+      
+      // 降级：从 localStorage 读取
       try {
         const config = JSON.parse(localStorage.getItem('apiConfig') || '{}');
-        return config.openrouter?.model || 'openai/gpt-4o';
+        return config.siliconflow?.model || config.openrouter?.model || config.openai?.model || 'openai/gpt-4o';
       } catch (e) {
         return 'openai/gpt-4o';
       }
     }
 
-    // 店铺变更
-    function onStoreChange() {
-      currentStoreId = document.getElementById('storeFilter').value;
-      const storeName = currentStoreId ? getStoreName(currentStoreId) : '全部店铺';
-      if (messages.length > 0) {
-        addMessage('system', `已切换到 ${storeName}，当前分析基于该店铺数据`);
+    // ============ 店铺/账户管理 ============
+    let storesData = [];      // 缓存的店铺数据
+    let selectedStore = null; // 当前选中的店铺
+
+    // 从 API 加载店铺列表
+    async function loadStores() {
+      const listEl = document.getElementById('accountList');
+      try {
+        const res = await fetch('/api/lingxing/stores');
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          storesData = json.data;
+          renderStoreList(storesData);
+          // 自动选中第一个
+          if (storesData.length > 0) {
+            selectStore(storesData[0].store_id || storesData[0].id);
+          }
+        } else {
+          // API 没有数据，使用默认模拟数据
+          storesData = [
+            { store_id: 'store_us', store_name: '美国站', marketplace: 'Amazon.com', region: 'US' },
+            { store_id: 'store_uk', store_name: '英国站', marketplace: 'Amazon.co.uk', region: 'UK' },
+            { store_id: 'store_de', store_name: '德国站', marketplace: 'Amazon.de', region: 'DE' },
+            { store_id: 'store_jp', store_name: '日本站', marketplace: 'Amazon.co.jp', region: 'JP' }
+          ];
+          renderStoreList(storesData);
+          selectStore('store_us');
+        }
+      } catch (e) {
+        console.log('加载店铺失败，使用默认数据:', e);
+        storesData = [
+          { store_id: 'store_us', store_name: '美国站', marketplace: 'Amazon.com', region: 'US' },
+          { store_id: 'store_uk', store_name: '英国站', marketplace: 'Amazon.co.uk', region: 'UK' },
+          { store_id: 'store_de', store_name: '德国站', marketplace: 'Amazon.de', region: 'DE' },
+          { store_id: 'store_jp', store_name: '日本站', marketplace: 'Amazon.co.jp', region: 'JP' }
+        ];
+        renderStoreList(storesData);
+        selectStore('store_us');
       }
     }
 
-    // 获取店铺名称
+    // 渲染店铺列表到右侧面板
+    function renderStoreList(stores) {
+      const listEl = document.getElementById('accountList');
+      if (!stores || stores.length === 0) {
+        listEl.innerHTML = `
+          <div class="account-empty">
+            <div class="empty-icon">🏪</div>
+            暂无店铺数据<br>
+            <button onclick="syncStores()" style="margin-top:8px;padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">同步店铺</button>
+          </div>`;
+        return;
+      }
+
+      // 按 region 分组
+      const groups = {};
+      stores.forEach(s => {
+        const region = s.region || '其他';
+        if (!groups[region]) groups[region] = [];
+        groups[region].push(s);
+      });
+
+      const regionNames = { US: '北美', UK: '欧洲', DE: '欧洲', FR: '欧洲', IT: '欧洲', ES: '欧洲', JP: '亚太', AU: '亚太', CA: '北美', MX: '北美' };
+
+      let html = '';
+      for (const [region, items] of Object.entries(groups)) {
+        html += `<div class="account-group">
+          <div class="account-group-label">${regionNames[region] || region}</div>`;
+        items.forEach(s => {
+          const sid = s.store_id || s.id;
+          const name = s.store_name || s.name || sid;
+          const market = s.marketplace || '';
+          const isActive = selectedStore && (selectedStore.store_id === sid || selectedStore.id === sid);
+          html += `
+            <div class="account-item ${isActive ? 'active' : ''}" data-store-id="${sid}" onclick="selectStore('${sid}')">
+              <div class="account-icon">${name.charAt(0)}</div>
+              <div class="account-info">
+                <div class="account-name">${name}</div>
+                <div class="account-meta">${market}</div>
+              </div>
+              <div class="account-check"></div>
+            </div>`;
+        });
+        html += '</div>';
+      }
+      listEl.innerHTML = html;
+    }
+
+    // 选中店铺
+    function selectStore(storeId) {
+      const store = storesData.find(s => (s.store_id || s.id) === storeId);
+      if (!store) return;
+      selectedStore = store;
+      currentStoreId = storeId;
+
+      // 更新 UI 选中状态
+      document.querySelectorAll('.account-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.storeId === storeId);
+      });
+
+      // 更新顶部标签
+      const name = store.store_name || store.name || storeId;
+      document.getElementById('currentStoreLabel').textContent = '📍 ' + name;
+      document.getElementById('accountContext').style.display = 'block';
+      document.getElementById('selectedAccountName').textContent = name;
+    }
+
+    // 同步店铺（从领星 API 拉取）
+    async function syncStores() {
+      const btn = document.getElementById('syncStoresBtn');
+      btn.classList.add('spinning');
+      try {
+        const res = await fetch('/api/lingxing/stores?sync=1', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('店铺同步成功', 'success');
+          await loadStores();
+        } else {
+          showToast('同步失败: ' + (json.message || '未知错误'), 'error');
+        }
+      } catch (e) {
+        showToast('同步失败', 'error');
+      } finally {
+        btn.classList.remove('spinning');
+      }
+    }
+
+    // 获取店铺名称（兼容旧代码）
     function getStoreName(storeId) {
-      const stores = {
-        'store_us': '美国站',
-        'store_uk': '英国站',
-        'store_de': '德国站',
-        'store_jp': '日本站'
-      };
-      return stores[storeId] || storeId;
+      const s = storesData.find(x => (x.store_id || x.id) === storeId);
+      if (s) return s.store_name || s.name || storeId;
+      const fallback = { store_us: '美国站', store_uk: '英国站', store_de: '德国站', store_jp: '日本站' };
+      return fallback[storeId] || storeId;
+    }
+
+    // 构建店铺上下文信息，自动附加到AI请求中
+    function buildStoreContext(store) {
+      const parts = [];
+      if (store.marketplace) parts.push(`站点: ${store.marketplace}`);
+      if (store.region) parts.push(`区域: ${store.region}`);
+      if (store.profile_id) parts.push(`Profile ID: ${store.profile_id}`);
+      if (store.account_id) parts.push(`Account ID: ${store.account_id}`);
+      if (store.currency) parts.push(`货币: ${store.currency}`);
+      return parts.length > 0 ? `店铺信息: ${parts.join(', ')}` : '';
     }
 
     // 快捷指令
@@ -781,31 +1247,69 @@
       });
     }
 
-    // 读取 Excel 文件
+    // 读取 Excel 文件（使用 SheetJS 库解析）
     function readExcelFile(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = function(e) {
           try {
             const data = new Uint8Array(e.target.result);
-            // 简化的Excel解析，提取文本内容
             let content = `[Excel文件内容 - ${file.name}]\n`;
             content += `文件大小: ${formatFileSize(file.size)}\n\n`;
 
-            // 检查是否是CSV
+            // 检查是否是 CSV
             if (file.name.endsWith('.csv')) {
               const text = new TextDecoder().decode(data);
-              const lines = text.split('\n').slice(0, 50); // 只取前50行
-              content += '--- CSV 内容预览 ---\n';
+              const lines = text.split('\n').slice(0, 100); // CSV 最多读取前 100 行
+              content += '--- CSV 数据（前 100 行）---\n';
               content += lines.join('\n');
-              if (text.split('\n').length > 50) {
+              if (text.split('\n').length > 100) {
                 content += '\n...(更多行已省略)';
               }
               resolve(content);
+              return;
+            }
+
+            // 尝试使用 SheetJS 解析 xlsx
+            if (typeof XLSX !== 'undefined') {
+              try {
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                let hasData = false;
+
+                // 遍历所有工作表
+                for (const sheetName of workbook.SheetNames) {
+                  const worksheet = workbook.Sheets[sheetName];
+                  // 转换为 CSV 格式（限制 200 行避免 token 超限）
+                  let csvContent = XLSX.utils.sheet_to_csv(worksheet);
+                  const lines = csvContent.split('\n').slice(0, 200);
+
+                  if (lines.length > 1) { // 有表头和数据
+                    hasData = true;
+                    content += `=== 工作表: ${sheetName} ===\n`;
+                    content += lines.join('\n');
+                    if (csvContent.split('\n').length > 200) {
+                      content += '\n...(更多行已省略，完整数据请分段上传)';
+                    }
+                    content += '\n\n';
+                  }
+                }
+
+                if (hasData) {
+                  resolve(content);
+                } else {
+                  // 工作表为空
+                  content += '[注意：该 Excel 文件工作表为空或数据量极少]\n';
+                  resolve(content);
+                }
+              } catch (xlsxErr) {
+                console.log('SheetJS 解析失败，使用简化模式:', xlsxErr.message);
+                content += '[Excel 解析失败，已将文件基本信息发送给 AI]\n';
+                content += `文件名: ${file.name}\n`;
+                resolve(content);
+              }
             } else {
-              // 对于xlsx，提示需要AI分析
-              content += '--- Excel数据 ---\n';
-              content += `[请AI分析此Excel文件中的数据]\n`;
+              // 没有 SheetJS 库，提示用户
+              content += '[提示：建议上传 CSV 格式以获得更好的数据解析效果]\n';
               content += `文件名: ${file.name}\n`;
               resolve(content);
             }
@@ -864,11 +1368,11 @@
       renderUploadedFiles();
     }
 
-    // 发送消息
+    // 发送消息（支持多轮对话）
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
-      const model = getCurrentModel(); // 从系统设置获取默认模型
+      const model = await getCurrentModel(); // 从后端 API 获取当前模型
 
       if (!text && uploadedFiles.length === 0 || isTyping) return;
 
@@ -881,6 +1385,12 @@
         fullQuery = `请分析以下文件内容：\n\n${fileSummary}\n\n${text || '请给出分析结果和建议。'}`;
       }
 
+      // 自动附加当前选中的店铺/账户信息
+      if (selectedStore) {
+        const storeCtx = buildStoreContext(selectedStore);
+        fullQuery = `[当前店铺: ${selectedStore.store_name || selectedStore.name || selectedStore.store_id}]\n${storeCtx}\n\n${fullQuery}`;
+      }
+
       // 清空输入框
       input.value = '';
       input.style.height = 'auto';
@@ -888,25 +1398,37 @@
       // 隐藏空状态
       document.getElementById('emptyState').style.display = 'none';
 
-      // 添加用户消息
+      // 添加用户消息到本地显示
       let displayText = text || '分析上传的文件';
       if (uploadedFiles.length > 0) {
         displayText += '\n\n📎 已上传文件：' + uploadedFiles.map(f => f.name).join(', ');
       }
       addMessage('user', displayText);
 
-      // 保存到历史记录
-      const convId = 'C' + Date.now().toString(36).toUpperCase();
+      // 保存用户消息到对话历史（用于多轮对话）
+      messages.push({ role: 'user', content: fullQuery });
+
+      // 限制历史长度
+      if (messages.length > MAX_HISTORY * 2) {
+        messages = messages.slice(-MAX_HISTORY * 2);
+      }
+
+      // 生成会话 ID（用于多轮对话）
+      if (!conversationId) {
+        conversationId = 'C' + Date.now().toString(36).toUpperCase();
+      }
 
       // 显示加载状态
       showTyping();
 
       try {
-        const response = await fetch(`${API_BASE}/ai/query`, {
+        // 调用 /agent/chat 接口（支持多轮对话）
+        const response = await fetch('/api/agent/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            query: fullQuery,
+            message: fullQuery,
+            sessionId: conversationId,
             storeId: currentStoreId,
             model: model
           })
@@ -916,18 +1438,18 @@
         hideTyping();
 
         if (data.success) {
-          // 去重：检查是否是重复的响应
-          if (data.response && data.response !== lastAiResponse) {
-            lastAiResponse = data.response;
-            addMessage('ai', data.response + '\n\n---\n*模型: ' + getModelName(model) + '*');
+          // 添加 AI 响应到对话历史
+          if (data.response) {
+            messages.push({ role: 'assistant', content: data.response });
+            addMessage('ai', data.response + '\n\n---\n*模型: ' + model + '*');
           }
           // 清空上传的文件
           uploadedFiles = [];
           document.getElementById('fileInput').value = '';
           renderUploadedFiles();
-          // 保存对话到历史
+          // 保存对话到历史（用于侧边栏历史记录列表）
           conversationHistory.saveConversation({
-            id: convId,
+            id: conversationId,
             userQuery: text,
             aiResponse: data.response,
             model: model,
@@ -937,23 +1459,17 @@
           // 处理任务生成：检查响应中是否包含任务信息
           if (data.taskId) {
             console.log('AI生成了任务:', data.taskId);
-            showToast(`AI已自动生成任务，正在刷新任务列表...`, 'success');
-            // 延迟刷新任务列表，确保后端已保存
-            setTimeout(() => {
-              if (typeof taskList !== 'undefined') {
-                taskList.loadStats();
-              }
-              // 自动打开任务详情
-              setTimeout(() => {
-                if (typeof openTaskDetailModal === 'function') {
-                  openTaskDetailModal(data.taskId);
-                }
-              }, 500);
-            }, 1000);
+            // 在对话中插入任务卡片
+            addTaskCard(data.taskId);
+            showToast(`AI已自动生成任务`, 'success');
+            // 刷新任务列表徽章
+            if (typeof taskList !== 'undefined') {
+              taskList.loadStats();
+            }
           }
         } else {
           // 提供更友好的错误提示和解决方案
-          let errorMsg = data.error || '未知错误';
+          let errorMsg = data.error || data.message || '未知错误';
           let solution = '';
           
           if (errorMsg.includes('not available in your region') || errorMsg.includes('region')) {
@@ -964,23 +1480,22 @@
 💡 **解决方案**：
 您选择的模型在当前地区不可用。请尝试以下方法：
 
-1. 在模型选择器中选择 **"OpenRouter 自动选择 (免费)"**
-2. 或者选择带有 OpenRouter 前缀的模型，如 **"openai/gpt-4o"**
-3. 如果问题持续，请在系统设置中检查 OpenRouter API Key 是否配置正确`;
+1. 在「系统设置」中切换到 **SiliconFlow**（推荐，免费额度大）
+2. 或者在 OpenRouter 中选择 **"openai/gpt-4o"** 等带有前缀的模型`;
           } else if (errorMsg.includes('API Key') || errorMsg.includes('api key')) {
             solution = `
 
 ---
 
 💡 **解决方案**：
-请在「系统设置」页面中配置 OpenRouter API Key`;
+请在「系统设置」页面中配置 AI API Key`;
           } else if (errorMsg.includes('quota') || errorMsg.includes('credit')) {
             solution = `
 
 ---
 
 💡 **解决方案**：
-您的 OpenRouter 账户余额不足，请前往 https://openrouter.ai/credits 充值`;
+您的 API 账户额度不足，请前往对应的 API 提供商充值或切换到 SiliconFlow`;
           }
 
           addMessage('ai', `❌ 发生错误：${errorMsg}${solution}\n\n---\n*模型: ${getModelName(model)}*`);
@@ -996,9 +1511,47 @@
       }
     }
 
+    // 开始新对话
+    function startNewConversation() {
+      // 清空本地对话历史
+      messages = [];
+      conversationId = null;
+      
+      // 清空聊天显示
+      const messagesContainer = document.getElementById('messages');
+      if (messagesContainer) {
+        messagesContainer.innerHTML = '';
+      }
+      
+      // 显示空状态
+      document.getElementById('emptyState').style.display = 'flex';
+      
+      // 清空上传的文件
+      uploadedFiles = [];
+      renderUploadedFiles();
+      
+      // 清空输入框
+      const input = document.getElementById('messageInput');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      
+      showToast('已开启新对话', 'success');
+    }
+    window.startNewConversation = startNewConversation;
+
     // 获取模型显示名称
     function getModelName(modelId) {
       const names = {
+        // SiliconFlow 模型
+        'Qwen/Qwen3-8B': 'Qwen3-8B (SF)',
+        'Qwen/Qwen3-30B-A3B': 'Qwen3-30B (SF)',
+        'Qwen/Qwen3-235B-A22B': 'Qwen3-235B (SF)',
+        'deepseek-ai/DeepSeek-V3': 'DeepSeek-V3 (SF)',
+        'deepseek-ai/DeepSeek-R1': 'DeepSeek-R1 (SF)',
+        'THUDM/glm-4-9b-chat': 'GLM-4-9B (SF)',
+        // OpenRouter 模型
         'openrouter/free': '自动选择',
         'google/gemma-4-31b-it': 'Gemma 4 31B',
         'openai/gpt-4o': 'GPT-4o',
@@ -1007,7 +1560,9 @@
         'anthropic/claude-3-opus': 'Claude 3 Opus',
         'google/gemini-pro-1.5': 'Gemini Pro',
         'meta-llama/llama-3-70b-instruct': 'Llama 3 70B',
-        'mistralai/mixtral-8x7b-instruct': 'Mixtral 8x7B'
+        'mistralai/mixtral-8x7b-instruct': 'Mixtral 8x7B',
+        'deepseek/deepseek-v4-flash': 'DeepSeek-V4',
+        'deepseek/deepseek-chat-v3-0324': 'DeepSeek-V3'
       };
       return names[modelId] || modelId;
     }
@@ -1016,7 +1571,7 @@
     function addMessage(type, text) {
       const messagesContainer = document.getElementById('messages');
       const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-      
+
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${type}`;
       messageDiv.innerHTML = `
@@ -1026,11 +1581,89 @@
           <div class="message-time">${time}</div>
         </div>
       `;
-      
+
       messagesContainer.appendChild(messageDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
+
       messages.push({ type, text, time });
+    }
+
+    // 在对话中插入任务卡片
+    async function addTaskCard(taskId) {
+      const messagesContainer = document.getElementById('messages');
+      const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+      // 先显示加载状态
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'message ai task-card-msg';
+      cardDiv.innerHTML = `
+        <div class="message-avatar">📋</div>
+        <div class="message-content">
+          <div class="task-card loading" id="task-card-${taskId}">
+            <div class="task-card-header">
+              <span class="task-card-icon">⏳</span>
+              <span class="task-card-title">正在创建任务...</span>
+            </div>
+          </div>
+          <div class="message-time">${time}</div>
+        </div>
+      `;
+      messagesContainer.appendChild(cardDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      // 拉取任务详情
+      try {
+        const res = await fetch(`/api/tasks/${taskId}`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          const t = json.data;
+          const items = t.items || [];
+          const completed = items.filter(i => i.status === 'completed').length;
+          const card = document.getElementById(`task-card-${taskId}`);
+          if (card) {
+            card.className = 'task-card';
+            card.innerHTML = `
+              <div class="task-card-header">
+                <span class="task-card-icon">📋</span>
+                <span class="task-card-title">${escapeHtml(t.name)}</span>
+                <span class="task-card-status ${t.status}">${statusLabel(t.status)}</span>
+              </div>
+              <div class="task-card-desc">${escapeHtml(t.description || '')}</div>
+              ${items.length > 0 ? `
+                <div class="task-card-progress">
+                  <div class="task-progress-bar">
+                    <div class="task-progress-fill" style="width:${items.length ? (completed / items.length * 100) : 0}%"></div>
+                  </div>
+                  <span class="task-progress-text">${completed}/${items.length}</span>
+                </div>
+                <div class="task-card-items">
+                  ${items.slice(0, 3).map(i => `
+                    <div class="task-item-row ${i.status}">
+                      <span class="task-item-dot"></span>
+                      <span class="task-item-title">${escapeHtml(i.title)}</span>
+                    </div>
+                  `).join('')}
+                  ${items.length > 3 ? `<div class="task-item-more">+${items.length - 3} 个子任务</div>` : ''}
+                </div>
+              ` : ''}
+              <div class="task-card-actions">
+                <a href="ai-tasks.html" target="_blank" class="task-card-btn">查看任务中心 →</a>
+              </div>
+            `;
+          }
+        }
+      } catch (e) {
+        console.error('加载任务卡片失败:', e);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function statusLabel(s) {
+      const map = { pending: '待处理', in_progress: '进行中', completed: '已完成', cancelled: '已取消' };
+      return map[s] || s;
     }
 
     // 格式化消息（支持换行和基本格式）

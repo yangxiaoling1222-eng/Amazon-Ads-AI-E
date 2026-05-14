@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI自动优化 - 亚马逊广告AI专家</title>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --primary: #667eea;
@@ -29,12 +30,16 @@
       min-height: 100vh;
     }
 
-    .layout { min-height: 100vh; }
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
 
     /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
 
     /* 主内容区 - 左侧留出侧边栏宽度 */
     .main {
+      flex: 1;
       margin-left: 260px;
       padding: 24px;
       overflow-y: auto;
@@ -900,8 +905,18 @@
     .chat-qp-btn { padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; transition: all .15s; white-space: nowrap; }
     .chat-qp-btn:hover { border-color: var(--primary); color: var(--primary); background: rgba(102,126,234,.06); }
     .chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
-    .chat-input-wrap { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: flex-end; gap: 10px; transition: border-color .15s; }
+    .chat-input-wrap { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: flex-end; gap: 10px; transition: border-color .15s; position: relative; }
     .chat-input-wrap:focus-within { border-color: var(--primary); }
+
+    /* 文件上传 */
+    .chat-file-btn { width: 32px; height: 32px; border-radius: 8px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s; }
+    .chat-file-btn:hover { background: rgba(102,126,234,.1); color: var(--primary); }
+    .chat-file-btn svg { width: 18px; height: 18px; }
+    .chat-file-preview { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .chat-file-tag { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(102,126,234,.1); border: 1px solid rgba(102,126,234,.2); border-radius: 6px; font-size: 12px; color: var(--primary); }
+    .chat-file-tag .remove { cursor: pointer; font-size: 14px; line-height: 1; }
+    .chat-file-tag .remove:hover { color: var(--danger); }
+    .chat-file-input { display: none; }
     .chat-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 14px; resize: none; max-height: 120px; min-height: 24px; font-family: inherit; line-height: 1.5; }
     .chat-send-btn { width: 38px; height: 38px; border-radius: 10px; background: var(--primary); border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
     .chat-send-btn:hover { background: var(--primary-dark); }
@@ -932,6 +947,126 @@
     .chat-stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
     .chat-stat strong { color: var(--text-primary); }
     .chat-layout { display: flex; height: 100%; }
+
+    /* ── AI对话 Tab 增强样式 ── */
+    /* 快捷指令 */
+    .ai-quick-commands {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+    }
+    .ai-quick-cmd {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ai-quick-cmd:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .ai-quick-cmd svg { width: 13px; height: 13px; }
+
+    /* 历史记录面板 */
+    .ai-history-panel {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 320px;
+      height: 100%;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+    }
+    .ai-history-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ai-history-header h4 { font-size: 14px; font-weight: 600; }
+    .ai-history-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .ai-history-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: all 0.15s;
+    }
+    .ai-history-item:hover { background: var(--bg-input); }
+    .ai-history-item .title { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ai-history-item .time { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .ai-history-empty { padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+
+    /* 右侧店铺面板（嵌入 chat-panel-right 顶部） */
+    .chat-store-panel {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #f8f9ff 0%, #f5f6ff 100%);
+    }
+    .chat-store-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .chat-store-title { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+    .chat-store-sync {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+    .chat-store-sync:hover { background: var(--bg-input); color: var(--primary); }
+    .chat-store-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .chat-store-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .chat-store-item:hover { background: rgba(102,126,234,.08); }
+    .chat-store-item.active { border-color: var(--primary); background: rgba(102,126,234,.1); }
+    .chat-store-item .icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600;
+      flex-shrink: 0;
+    }
+    .chat-store-item .info { flex: 1; min-width: 0; }
+    .chat-store-item .name { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-store-item .meta { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
+    .chat-store-item .check { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #d1d5db; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+    .chat-store-item.active .check { background: var(--primary); border-color: var(--primary); }
+    .chat-store-item.active .check::after { content: '✓'; color: #fff; font-size: 10px; font-weight: 700; }
+    .chat-store-current { font-size: 11px; color: var(--text-secondary); padding: 6px 0 0; border-top: 1px solid var(--border); margin-top: 8px; }
+    .chat-store-current strong { color: var(--text-primary); }
 
     /* ── 关键词收割 Tab ── */
     .harvest-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
@@ -1191,7 +1326,18 @@
       </div>
 
       <!-- ── Tab 3: AI 对话 ── -->
-      <div id="tab-ai" class="tab-panel">
+      <div id="tab-ai" class="tab-panel" style="position:relative;">
+        <!-- 历史记录面板 -->
+        <div class="ai-history-panel" id="aiHistoryPanel" style="display:none;">
+          <div class="ai-history-header">
+            <h4>📜 历史记录</h4>
+            <button onclick="closeAIHistory()" style="border:none;background:none;cursor:pointer;font-size:18px;padding:4px;">×</button>
+          </div>
+          <div class="ai-history-list" id="aiHistoryList">
+            <div class="ai-history-empty">暂无历史记录</div>
+          </div>
+        </div>
+
         <div class="chat-layout" style="height:calc(100vh - 200px); min-height:500px; background:#fff; border-radius:12px; border:1px solid var(--border); overflow:hidden;">
           <!-- 左侧对话区 -->
           <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
@@ -1202,8 +1348,33 @@
                 <div style="font-size:12px; color:var(--text-secondary);">支持自然语言广告操作 · Function Calling</div>
               </div>
               <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                <button onclick="openAIHistory()" style="padding:6px 12px; border-radius:8px; font-size:12px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;" title="历史记录">📜 历史</button>
                 <button onclick="chatClearSession()" style="padding:6px 12px; border-radius:8px; font-size:12px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;" title="清除会话历史">🗑️ 清除</button>
               </div>
+            </div>
+
+            <!-- 快捷指令 -->
+            <div class="ai-quick-commands">
+              <button class="ai-quick-cmd" onclick="sendAIQuickCmd('分析本周广告表现')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                分析本周表现
+              </button>
+              <button class="ai-quick-cmd" onclick="sendAIQuickCmd('找出ACOS超标的活动')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                ACOS超标
+              </button>
+              <button class="ai-quick-cmd" onclick="sendAIQuickCmd('推荐本周新增关键词')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                新增关键词
+              </button>
+              <button class="ai-quick-cmd" onclick="sendAIQuickCmd('优化预算分配建议')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                预算优化
+              </button>
+              <button class="ai-quick-cmd" onclick="sendAIQuickCmd('生成上周广告报告')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+                广告报告
+              </button>
             </div>
 
             <div class="chat-panel-body" id="chat-messages">
@@ -1236,8 +1407,15 @@
                 <button class="chat-qp-btn" onclick="setChatInput('执行关键词收割')">关键词收割</button>
                 <button class="chat-qp-btn" onclick="setChatInput('分析预算利用率')">预算分析</button>
               </div>
+              <!-- 文件预览 -->
+              <div class="chat-file-preview" id="chatFilePreview"></div>
+
               <div class="chat-input-row">
                 <div class="chat-input-wrap">
+                  <button class="chat-file-btn" onclick="document.getElementById('chatFileInput').click()" title="上传文件">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                  </button>
+                  <input type="file" id="chatFileInput" class="chat-file-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif" onchange="handleChatFileSelect(this.files)">
                   <textarea id="chat-input" class="chat-input" rows="1" placeholder="输入指令，例如：帮我分析 ACOS 超过 30% 的活动..." onkeydown="handleChatKey(event)" oninput="autoResizeChat(this)"></textarea>
                 </div>
                 <button id="chat-send-btn" class="chat-send-btn" onclick="sendChat()" title="发送 (Enter)">
@@ -1249,6 +1427,20 @@
 
           <!-- 右侧面板（精简版：模型信息 + 安全模式 + 工具 + 任务中心） -->
           <div class="chat-panel-right">
+
+            <!-- 店铺选择（新增） -->
+            <div class="chat-store-panel" id="chatStorePanel">
+              <div class="chat-store-header">
+                <span class="chat-store-title">🏪 店铺账户</span>
+                <button class="chat-store-sync" onclick="syncChatStores()" title="同步店铺">🔄</button>
+              </div>
+              <div class="chat-store-list" id="chatStoreList">
+                <div style="padding:12px; text-align:center; color:var(--text-secondary); font-size:12px;">加载中...</div>
+              </div>
+              <div class="chat-store-current" id="chatStoreCurrent">
+                已选择: <strong id="chatStoreName">--</strong>
+              </div>
+            </div>
 
             <!-- 当前模型信息（只读，从系统配置读取） -->
             <div class="chat-panel-section">
@@ -1590,6 +1782,9 @@
       if (endDateInput) {
         endDateInput.addEventListener('change', onDateChange);
       }
+      
+      // 加载店铺列表
+      loadChatStores();
     });
 
     // 日期变更事件
@@ -2584,10 +2779,49 @@
     async function sendChat() {
       const input = document.getElementById('chat-input');
       const message = input.value.trim();
-      if (!message || chatIsThinking) return;
+      if ((!message && !chatAttachedFiles.length) || chatIsThinking) return;
 
-      appendChatBubble('user', escapeHtml(message));
+      // 构建完整消息（包含文件内容）
+      let fullMessage = message;
+      if (chatAttachedFiles.length > 0) {
+        const fileContents = chatAttachedFiles.map(f => `[文件: ${f.name}]\n类型: ${f.type}\n内容:\n${f.content}`).join('\n\n');
+        fullMessage = message ? `${message}\n\n---\n${fileContents}` : fileContents;
+      }
+
+      // 构建用户消息显示内容（包含文件列表）
+      let displayHtml = '';
+      if (message) {
+        displayHtml += escapeHtml(message);
+      }
+      if (chatAttachedFiles.length > 0) {
+        const fileIcons = {
+          'xls': '📊', 'xlsx': '📊', 'csv': '📋',
+          'png': '🖼️', 'jpg': '🖼️', 'jpeg': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
+          'pdf': '📄', 'doc': '📝', 'docx': '📝',
+          'txt': '📄'
+        };
+        const fileListHtml = chatAttachedFiles.map(f => {
+          const ext = f.name.split('.').pop().toLowerCase();
+          const icon = fileIcons[ext] || '📎';
+          return `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:rgba(102,126,234,.08);border-radius:6px;margin-top:4px;font-size:13px;">
+            <span>${icon}</span>
+            <span>${escapeHtml(f.name)}</span>
+            <span style="opacity:.5;font-size:11px;">(${formatFileSize(f.size)})</span>
+          </div>`;
+        }).join('');
+        
+        if (message) displayHtml += '<div style="margin-top:8px;"></div>';
+        displayHtml += `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">📎 已上传 ${chatAttachedFiles.length} 个文件：</div>`;
+        displayHtml += fileListHtml;
+      }
+      
+      appendChatBubble('user', displayHtml || '已上传文件');
       input.value = ''; input.style.height = 'auto';
+
+      // 清空已上传文件
+      chatAttachedFiles = [];
+      renderChatFilePreview();
+      document.getElementById('chatFileInput').value = ''; // 重置 file input，允许再次选择相同文件
 
       const thinkEl = appendChatThinking();
       chatIsThinking = true;
@@ -2598,7 +2832,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message,
+            message: fullMessage,
             sessionId: chatSessionId,
             dryRunAll: chatSafeMode
             // apiKey/model/profileId 由后端从系统配置自动读取
@@ -3148,6 +3382,366 @@
         showToast('网络错误', 'error');
       }
     }
+
+    // ================================================================
+    // AI对话增强功能：店铺管理、历史记录、快捷指令
+    // ================================================================
+    let chatStoresData = [];
+    let chatSelectedStore = null;
+
+    // 加载店铺列表（从 API 自动拉取）
+    async function loadChatStores() {
+      const listEl = document.getElementById('chatStoreList');
+      if (!listEl) return;
+      try {
+        const res = await fetch('/api/lingxing/stores');
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          chatStoresData = json.data;
+        } else {
+          // 回退到默认模拟数据
+          chatStoresData = [
+            { store_id: 'store_us', store_name: '美国站', marketplace: 'Amazon.com', region: 'US' },
+            { store_id: 'store_uk', store_name: '英国站', marketplace: 'Amazon.co.uk', region: 'UK' },
+            { store_id: 'store_de', store_name: '德国站', marketplace: 'Amazon.de', region: 'DE' },
+            { store_id: 'store_jp', store_name: '日本站', marketplace: 'Amazon.co.jp', region: 'JP' }
+          ];
+        }
+      } catch (e) {
+        chatStoresData = [
+          { store_id: 'store_us', store_name: '美国站', marketplace: 'Amazon.com', region: 'US' },
+          { store_id: 'store_uk', store_name: '英国站', marketplace: 'Amazon.co.uk', region: 'UK' },
+          { store_id: 'store_de', store_name: '德国站', marketplace: 'Amazon.de', region: 'DE' },
+          { store_id: 'store_jp', store_name: '日本站', marketplace: 'Amazon.co.jp', region: 'JP' }
+        ];
+      }
+      renderChatStoreList();
+      // 自动选中第一个
+      if (chatStoresData.length > 0) {
+        selectChatStore(chatStoresData[0].store_id || chatStoresData[0].id);
+      }
+    }
+
+    // 渲染店铺列表
+    function renderChatStoreList() {
+      const listEl = document.getElementById('chatStoreList');
+      if (!listEl || !chatStoresData.length) {
+        listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-secondary);font-size:12px;">暂无店铺数据</div>';
+        return;
+      }
+      const regionNames = { US: '北美', UK: '欧洲', DE: '欧洲', FR: '欧洲', IT: '欧洲', ES: '欧洲', JP: '亚太', AU: '亚太', CA: '北美', MX: '北美' };
+      const groups = {};
+      chatStoresData.forEach(s => {
+        const region = s.region || '其他';
+        if (!groups[region]) groups[region] = [];
+        groups[region].push(s);
+      });
+      let html = '';
+      for (const [region, items] of Object.entries(groups)) {
+        html += `<div style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;padding:4px 0;margin-top:4px;">${regionNames[region] || region}</div>`;
+        items.forEach(s => {
+          const sid = s.store_id || s.id;
+          const name = s.store_name || s.name || sid;
+          const market = s.marketplace || '';
+          const isActive = chatSelectedStore && (chatSelectedStore.store_id === sid || chatSelectedStore.id === sid);
+          html += `<div class="chat-store-item ${isActive ? 'active' : ''}" data-store-id="${sid}" onclick="selectChatStore('${sid}')">
+            <div class="icon">${name.charAt(0)}</div>
+            <div class="info">
+              <div class="name">${name}</div>
+              <div class="meta">${market}</div>
+            </div>
+            <div class="check"></div>
+          </div>`;
+        });
+      }
+      listEl.innerHTML = html;
+    }
+
+    // 选中店铺
+    function selectChatStore(storeId) {
+      const store = chatStoresData.find(s => (s.store_id || s.id) === storeId);
+      if (!store) return;
+      chatSelectedStore = store;
+      // 更新 UI
+      document.querySelectorAll('.chat-store-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.storeId === storeId);
+      });
+      const name = store.store_name || store.name || storeId;
+      const nameEl = document.getElementById('chatStoreName');
+      if (nameEl) nameEl.textContent = name;
+      // 更新输入框 placeholder，附加店铺上下文
+      const inputEl = document.getElementById('chat-input');
+      if (inputEl) {
+        inputEl.placeholder = `📍 ${name} — 输入指令...`;
+      }
+    }
+
+    // 同步店铺
+    async function syncChatStores() {
+      const btn = document.querySelector('.chat-store-sync');
+      if (btn) btn.textContent = '⏳';
+      try {
+        const res = await fetch('/api/lingxing/stores?sync=1', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('店铺同步成功', 'success');
+          await loadChatStores();
+        } else {
+          showToast('同步失败', 'error');
+        }
+      } catch (e) {
+        showToast('同步失败', 'error');
+      } finally {
+        if (btn) btn.textContent = '🔄';
+      }
+    }
+
+    // 快捷指令发送
+    function sendAIQuickCmd(cmd) {
+      const inputEl = document.getElementById('chat-input');
+      if (!inputEl) return;
+      // 如果店铺已选择，附加店铺上下文
+      let fullCmd = cmd;
+      if (chatSelectedStore) {
+        const storeInfo = chatSelectedStore.store_name || chatSelectedStore.name || chatSelectedStore.store_id;
+        fullCmd = `[当前店铺: ${storeInfo}] ${cmd}`;
+      }
+      inputEl.value = fullCmd;
+      inputEl.focus();
+      // 直接发送
+      setTimeout(() => sendChat(), 100);
+    }
+
+    // 打开历史记录面板
+    function openAIHistory() {
+      const panel = document.getElementById('aiHistoryPanel');
+      if (!panel) return;
+      panel.style.display = 'flex';
+      loadAIHistory();
+    }
+
+    // 关闭历史记录面板
+    function closeAIHistory() {
+      const panel = document.getElementById('aiHistoryPanel');
+      if (panel) panel.style.display = 'none';
+    }
+
+    // 加载历史记录
+    async function loadAIHistory() {
+      const listEl = document.getElementById('aiHistoryList');
+      if (!listEl) return;
+      try {
+        const res = await fetch(CHAT_API + '/history');
+        const json = await res.json();
+        if (json.conversations && json.conversations.length > 0) {
+          listEl.innerHTML = json.conversations.map(c => `
+            <div class="ai-history-item" onclick="loadAIConversation('${c.id}')">
+              <div class="title">${escapeHtml(c.title || '新对话')}</div>
+              <div class="time">${c.updated_at || ''}</div>
+            </div>
+          `).join('');
+        } else {
+          listEl.innerHTML = '<div class="ai-history-empty">暂无历史记录</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div class="ai-history-empty">加载失败</div>';
+      }
+    }
+
+    // 加载指定历史对话
+    async function loadAIConversation(convId) {
+      try {
+        const res = await fetch(CHAT_API + '/history/' + convId);
+        const json = await res.json();
+        if (json.messages) {
+          const msgsEl = document.getElementById('chat-messages');
+          if (msgsEl) {
+            msgsEl.innerHTML = json.messages.map(m => {
+              if (m.role === 'user') {
+                return `<div class="chat-bubble user">${escapeHtml(m.content)}</div>`;
+              } else {
+                return `<div class="chat-bubble assistant">${escapeHtml(m.content)}</div>`;
+              }
+            }).join('');
+            scrollChatToBottom();
+          }
+        }
+        closeAIHistory();
+      } catch (e) {
+        showToast('加载失败', 'error');
+      }
+    }
+
+    // ================================================================
+    // 文件上传功能
+    // ================================================================
+    let chatAttachedFiles = [];
+
+    function handleChatFileSelect(files) {
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => {
+        // 检查是否已存在
+        if (chatAttachedFiles.some(f => f.name === file.name && f.size === file.size)) {
+          console.log('文件已存在:', file.name);
+          return;
+        }
+        
+        // 读取文件内容
+        const ext = file.name.split('.').pop().toLowerCase();
+        
+        // Excel 文件使用 SheetJS 解析
+        if (['xls','xlsx'].includes(ext)) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              console.log('开始解析 Excel 文件:', file.name);
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+              
+              let content = `[Excel表格: ${file.name} (${formatFileSize(file.size)})]\n工作表数量: ${workbook.SheetNames.length}\n`;
+              
+              workbook.SheetNames.forEach((sheetName, idx) => {
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                
+                if (jsonData.length > 0) {
+                  content += `\n【工作表 ${idx + 1}: ${sheetName}】\n`;
+                  // 限制行数避免内容过长
+                  const maxRows = 100;
+                  const displayData = jsonData.slice(0, maxRows);
+                  
+                  displayData.forEach((row, rowIdx) => {
+                    if (rowIdx === 0) {
+                      // 表头
+                      content += '表头: ' + row.join(' | ') + '\n';
+                      content += '数据: ' + '-'.repeat(30) + '\n';
+                    } else {
+                      content += row.join(' | ') + '\n';
+                    }
+                  });
+                  
+                  if (jsonData.length > maxRows) {
+                    content += `\n... 共 ${jsonData.length} 行，已显示前 ${maxRows} 行\n`;
+                  }
+                }
+              });
+              
+              // 限制总内容长度
+              if (content.length > 8000) {
+                content = content.slice(0, 8000) + '\n\n... [内容已截断]';
+              }
+              
+              chatAttachedFiles.push({
+                name: file.name,
+                size: file.size,
+                type: file.type || ext,
+                content: content
+              });
+              console.log('Excel 解析成功，已添加文件到列表');
+              renderChatFilePreview();
+            } catch (err) {
+              console.error('Excel 解析失败:', err);
+              alert(`Excel 文件解析失败: ${err.message}`);
+            }
+          };
+          reader.onerror = function(e) {
+            console.error('文件读取失败:', file.name, e);
+            alert(`读取文件失败: ${file.name}`);
+          };
+          reader.readAsArrayBuffer(file);
+          return;
+        }
+        
+        // 其他文件使用 FileReader
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          console.log('文件读取成功:', file.name, '类型:', ext);
+          let content = '';
+          
+          if (['png','jpg','jpeg','gif','webp'].includes(ext)) {
+            // 图片：转为 base64（截取前100字符作为预览）
+            content = `[图片文件: ${file.name} (${formatFileSize(file.size)})]\n[Base64预览]: ${e.target.result.slice(0, 100)}...`;
+          } else if (['pdf'].includes(ext)) {
+            // PDF 文件：显示基本信息
+            content = `[PDF文档: ${file.name} (${formatFileSize(file.size)})]\n提示: PDF文档已上传，请告诉AI直接分析此文件。`;
+          } else if (['doc','docx'].includes(ext)) {
+            // Word 文件：显示基本信息
+            content = `[Word文档: ${file.name} (${formatFileSize(file.size)})]\n提示: Word文档已上传，请告诉AI直接分析此文件。`;
+          } else if (['csv'].includes(ext)) {
+            // CSV 文件：读取文本内容
+            content = e.target.result;
+            if (content.length > 5000) {
+              content = content.slice(0, 5000) + '\n... [内容已截断，共 ' + content.length + ' 字符]';
+            }
+            content = `[CSV表格: ${file.name} (${formatFileSize(file.size)})]\n\n${content}`;
+          } else {
+            // 其他文本文件
+            content = e.target.result;
+            if (content.length > 5000) {
+              content = content.slice(0, 5000) + '\n... [内容已截断，共 ' + content.length + ' 字符]';
+            }
+          }
+          
+          chatAttachedFiles.push({
+            name: file.name,
+            size: file.size,
+            type: file.type || ext,
+            content: content
+          });
+          console.log('已添加文件到列表，当前文件数:', chatAttachedFiles.length);
+          renderChatFilePreview();
+        };
+        
+        reader.onerror = function(e) {
+          console.error('文件读取失败:', file.name, e);
+          alert(`读取文件失败: ${file.name}\n可能是文件过大或格式不支持`);
+        };
+        
+        if (['png','jpg','jpeg','gif','webp'].includes(ext)) {
+          reader.readAsDataURL(file);
+        } else {
+          reader.readAsText(file);
+        }
+      });
+    }
+
+    function renderChatFilePreview() {
+      const el = document.getElementById('chatFilePreview');
+      if (!el) {
+        console.error('找不到 chatFilePreview 元素');
+        return;
+      }
+      if (chatAttachedFiles.length === 0) {
+        el.innerHTML = '';
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'flex';
+      el.innerHTML = chatAttachedFiles.map((f, i) => `
+        <div class="chat-file-tag">
+          <span>📎 ${f.name}</span>
+          <span style="opacity:0.6;font-size:11px;">(${formatFileSize(f.size)})</span>
+          <span class="remove" onclick="removeChatFile(${i})" title="移除">×</span>
+        </div>
+      `).join('');
+      console.log('文件预览已更新:', chatAttachedFiles.map(f => f.name));
+    }
+
+    // 格式化文件大小
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function removeChatFile(index) {
+      chatAttachedFiles.splice(index, 1);
+      renderChatFilePreview();
+    }
+
+    // ================================================================
+    // 原有功能
+    // ================================================================
 
     // 添加/移除保护
     async function addKeywordProtection(keywordId) {

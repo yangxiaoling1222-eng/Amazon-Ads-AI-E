@@ -7,11 +7,16 @@
   <link rel="stylesheet" href="components/sidebar.css">
   <link rel="stylesheet" href="components/task-list.css">
   <style>
+    .layout { display: flex; min-height: 100vh; }
     .page-container {
+      flex: 1;
       margin-left: 260px;
       padding: 24px;
       min-height: 100vh;
       background: #f5f7fa;
+      box-sizing: border-box;
+      max-width: calc(100vw - 260px);
+      overflow-x: hidden;
     }
 
     .page-header {
@@ -32,6 +37,8 @@
       grid-template-columns: repeat(4, 1fr);
       gap: 16px;
       margin-bottom: 24px;
+      min-width: 0;
+      max-width: 100%;
     }
 
     .stat-card {
@@ -39,6 +46,7 @@
       border-radius: 12px;
       padding: 20px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      min-width: 0;
     }
 
     .stat-card .stat-value {
@@ -59,40 +67,54 @@
     .stat-card.cancelled .stat-value { color: #9ca3af; }
 
     .content-area {
-      display: grid;
-      grid-template-columns: 1fr 400px;
+      display: flex;
       gap: 24px;
+      align-items: flex-start;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
     }
 
     .main-list {
+      flex: 1;
+      min-width: 0;
       background: #fff;
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+      max-width: 100%;
     }
+
+    /* quick-add样式已合并到上面的定义中 */
 
     .list-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
       border-bottom: 1px solid #e5e7eb;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .list-header h3 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
     }
 
     .quick-add {
       background: #fff;
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
       height: fit-content;
       position: sticky;
       top: 24px;
+      width: 280px;
+      flex-shrink: 0;
+      box-sizing: border-box;
     }
 
     .quick-add h3 {
@@ -160,21 +182,45 @@
       min-height: 80px;
     }
 
+    @media (max-width: 1400px) {
+      .quick-add {
+        width: 260px;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .content-area {
+        gap: 16px;
+      }
+      .quick-add {
+        width: 240px;
+      }
+    }
+
     @media (max-width: 1024px) {
       .content-area {
-        grid-template-columns: 1fr;
+        flex-direction: column;
       }
       .quick-add {
         position: static;
+        width: 100% !important;
       }
     }
 
     @media (max-width: 768px) {
       .page-container {
         margin-left: 0;
+        padding: 16px;
       }
       .stats-row {
         grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .stat-card {
+        padding: 16px;
+      }
+      .stat-card .stat-value {
+        font-size: 24px;
       }
     }
   </style>

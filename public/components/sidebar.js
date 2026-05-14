@@ -9,11 +9,13 @@ class SidebarComponent {
     this.navItems = [
       { id: 'dashboard', icon: '📊', label: '仪表盘', path: 'index.html' },
       { id: 'ai-optimizer', icon: '⚡', label: 'AI自动优化', path: 'ai-optimizer.html' },
-      { id: 'ai-command', icon: '🎯', label: 'AI指挥中心', path: 'ai-command.html' },
+      // AI指挥中心功能已整合到 AI自动优化 页面的 AI对话 Tab，此处隐藏
+      // { id: 'ai-command', icon: '🎯', label: 'AI指挥中心', path: 'ai-command.html', hidden: true },
       { id: 'ai-tasks', icon: '📋', label: '任务中心', path: 'ai-tasks.html' },
       { id: 'scheduler', icon: '⏰', label: '广告调度', path: 'scheduler.html', hidden: true },
       { id: 'analysis-report', icon: '📈', label: '分析报告', path: 'analysis-report.html' },
-      { id: 'portfolios', icon: '🗂️', label: '广告组合管理', path: 'portfolios.html', adminOnly: true },
+      { id: 'ad-data', icon: '📺', label: '广告数据', path: 'ad-data.html' },
+      { id: 'portfolios', icon: '🗂️', label: '广告分配', path: 'portfolios.html', adminOnly: true },
       { id: 'users', icon: '👥', label: '用户管理', path: 'users.html', adminOnly: true },
       { id: 'system-logs', icon: '📋', label: '系统日志', path: 'system-logs.html', adminOnly: true },
       { id: 'data-sync', icon: '🔄', label: '数据同步', path: 'data-sync.html', adminOnly: true },
@@ -41,6 +43,11 @@ class SidebarComponent {
   getCurrentPage() {
     const path = window.location.pathname;
     const page = path.split('/').pop() || 'index.html';
+    // 在 app.html 中使用 hash 来判断当前页面
+    if (page === 'app.html') {
+      const hash = window.location.hash.substring(1);
+      return hash ? hash + '.html' : 'index.html';
+    }
     return page;
   }
 
@@ -86,12 +93,17 @@ class SidebarComponent {
             </div>
           </div>
           <nav class="sidebar-nav">
-            ${visibleItems.map(item => `
-              <a href="${item.path}" class="nav-item ${currentPage === item.path ? 'active' : ''}">
-                <span class="nav-icon">${item.icon}</span>
-                <span class="nav-label">${item.label}</span>
-              </a>
-            `).join('')}
+            ${visibleItems.map(item => {
+              const hash = item.path === 'index.html' ? '#' : '#' + item.path.replace('.html', '');
+              const isActive = currentPage === item.path || 
+                (item.path === 'index.html' && (currentPage === '' || currentPage === 'app.html'));
+              return `
+                <a href="${hash}" class="nav-item ${isActive ? 'active' : ''}">
+                  <span class="nav-icon">${item.icon}</span>
+                  <span class="nav-label">${item.label}</span>
+                </a>
+              `;
+            }).join('')}
           </nav>
           <div class="sidebar-footer">
             <div class="user-info">
@@ -288,15 +300,52 @@ function logout() {
   window.location.href = 'login.html';
 }
 
+// 检测是否在 iframe 内运行
+function isInIframe() {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    return true;
+  }
+}
+
 // 页面加载后自动初始化
 document.addEventListener('DOMContentLoaded', () => {
+  // 如果在 SPA 模式下，不自动初始化（由 app.html 手动控制）
+  if (window.__spaMode) return;
+
+  // 如果在 iframe 内，不自动初始化侧边栏（由父页面统一渲染）
+  if (isInIframe()) return;
+
   // 检查是否存在侧边栏容器
   const sidebarContainer = document.getElementById('sidebar');
   if (sidebarContainer) {
     const sidebar = new SidebarComponent('sidebar');
     sidebar.render();
+
+    // 绑定导航点击事件，使用AJAX加载页面内容
+    bindNavClickEvents();
   }
 });
+
+// 绑定导航点击事件
+function bindNavClickEvents() {
+  // 如果在 iframe 内或在 app.html 中，不处理（由父页面统一处理）
+  if (isInIframe() || window.location.pathname.includes('app.html')) return;
+
+  // 独立访问子页面时：点击菜单跳转到对应页面
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const href = item.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        const page = href.substring(1) || 'index';
+        const targetUrl = page === 'index' ? 'index.html' : page + '.html';
+        window.location.href = targetUrl;
+      }
+    });
+  });
+}
 
 // 导出供手动调用
 window.SidebarComponent = SidebarComponent;

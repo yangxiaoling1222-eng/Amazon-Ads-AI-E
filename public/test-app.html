@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Test</title>
+</head>
+<body>
+  <div id="result"></div>
+  <script>
+    async function test() {
+      try {
+        const res = await fetch('analysis-report.html');
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        const main = doc.querySelector('main.main') || doc.querySelector('.main') || doc.querySelector('main');
+        
+        document.getElementById('result').innerHTML = `
+          <p>Main found: ${!!main}</p>
+          <p>Main length: ${main ? main.innerHTML.length : 0}</p>
+          <p>Main tagName: ${main ? main.tagName : 'N/A'}</p>
+          <hr>
+          <pre>${main ? main.innerHTML.substring(0, 500) : 'No content'}</pre>
+        `;
+      } catch (e) {
+        document.getElementById('result').innerHTML = `<p style="color:red">Error: ${e.message}</p>`;
+      }
+    }
+    test();
+  </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>亚马逊广告 AI 智能专家</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .layout { display: flex; min-height: 100vh; }
+    #sidebar { width: 260px; flex-shrink: 0; }
+    #content { flex: 1; overflow-y: auto; min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar"></div>
+    <iframe id="content" style="flex:1; border:none; min-height:100vh; width:100%;"></iframe>
+  </div>
+  <script>
+    window.__spaMode = true;
+  </script>
+  <script src="components/sidebar.js"></script>
+  <script>
+    const routes = {
+      '': 'index.html',
+      'index': 'index.html',
+      'ai-optimizer': 'ai-optimizer.html',
+      'ai-command': 'ai-command.html',
+      'ai-tasks': 'ai-tasks.html',
+      'scheduler': 'scheduler.html',
+      'analysis-report': 'analysis-report.html',
+      'portfolios': 'portfolios.html',
+      'users': 'users.html',
+      'system-logs': 'system-logs.html',
+      'data-sync': 'data-sync.html',
+      'system-settings': 'system-settings.html'
+    };
+
+    function loadPage(page) {
+      const iframe = document.getElementById('content');
+      const file = routes[page] || 'index.html';
+      iframe.src = file;
+      history.pushState({ page }, '', '#' + page);
+      updateActiveNav(page);
+    }
+
+    function updateActiveNav(page) {
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('href') === '#' + page ||
+            (page === 'index' && item.getAttribute('href') === '#')) {
+          item.classList.add('active');
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const sidebar = new SidebarComponent('sidebar');
+      sidebar.render();
+
+      document.getElementById('sidebar').addEventListener('click', (e) => {
+        const navItem = e.target.closest('.nav-item');
+        if (navItem) {
+          e.preventDefault();
+          const href = navItem.getAttribute('href');
+          if (href && href.startsWith('#')) {
+            loadPage(href.substring(1) || 'index');
+          }
+        }
+      });
+
+      window.addEventListener('popstate', (e) => {
+        const page = e.state?.page || 'index';
+        loadPage(page);
+      });
+
+      const hash = window.location.hash.substring(1) || 'index';
+      loadPage(hash);
+    });
+  </script>
+</body>
+</html>

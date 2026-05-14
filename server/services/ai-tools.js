@@ -301,6 +301,35 @@ const TOOL_DEFINITIONS = [
         required: ['profileId']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_task',
+      description: '将用户的广告优化需求创建为系统任务，方便后续跟踪和执行。当用户说"生成任务""帮我创建一个任务""把这个加入任务列表"等时调用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          name:        { type: 'string', description: '任务名称，简洁概括用户需求，如"优化洗手片广告ACOS"' },
+          description: { type: 'string', description: '任务详细描述，包含用户提到的具体目标、时间、产品等信息' },
+          priority:    { type: 'string', enum: ['high', 'medium', 'low'], description: '优先级：high=高, medium=中, low=低', default: 'medium' },
+          items: {
+            type: 'array',
+            description: '子任务列表，将大任务拆分为可执行的子任务',
+            items: {
+              type: 'object',
+              properties: {
+                title:       { type: 'string', description: '子任务标题' },
+                description: { type: 'string', description: '子任务描述' },
+                actionType:  { type: 'string', enum: ['analyze', 'adjust_bid', 'adjust_budget', 'pause', 'enable', 'add_keyword', 'add_negative', 'harvest', 'report'], description: '操作类型' }
+              },
+              required: ['title', 'actionType']
+            }
+          }
+        },
+        required: ['name', 'description']
+      }
+    }
   }
 ];
 
@@ -531,6 +560,52 @@ class ToolExecutor {
             success: true,
             count: asinList.length,
             targetings: asinList.slice(0, 100)
+          };
+        }
+
+        // ── 创建任务 ─────────────────────────────────────────────
+        case 'create_task': {
+          const db = require('../config/database');
+          const taskId = 'T' + Date.now().toString(36).toUpperCase();
+          const now = new Date().toISOString();
+
+          db.run(`
+            INSERT INTO ai_tasks (id, name, description, source, source_id, priority, status, total_items, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            taskId,
+            args.name,
+            args.description || '',
+            'ai_chat',
+            '',
+            args.priority || 'medium',
+            'pending',
+            args.items?.length || 0,
+            now, now
+          ]);
+
+          if (args.items && args.items.length > 0) {
+            args.items.forEach(item => {
+              db.run(`
+                INSERT INTO ai_task_items (task_id, title, description, action_type, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+              `, [
+                taskId,
+                item.title || '',
+                item.description || '',
+                item.actionType || '',
+                'pending',
+                now
+              ]);
+            });
+          }
+
+          return {
+            success: true,
+            taskId,
+            name: args.name,
+            itemCount: args.items?.length || 0,
+            message: `任务「${args.name}」已创建，包含 ${args.items?.length || 0} 个子任务`
           };
         }
 

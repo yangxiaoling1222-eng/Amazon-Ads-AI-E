@@ -466,15 +466,40 @@ function insertInitialData() {
 }
 
 /**
- * 保存数据库到磁盘
+ * 保存数据库到磁盘（防抖：5秒内多次写入只触发一次磁盘IO）
  */
+let _saveTimer = null;
 function saveDatabase() {
-  if (db) {
+  if (!db) return;
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    try {
+      const data = db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(dbPath, buffer);
+    } catch (e) {
+      console.error('❌ 数据库写磁盘失败:', e.message);
+    }
+    _saveTimer = null;
+  }, 5000); // 5秒后统一写一次磁盘
+}
+
+// 进程退出前强制立即保存
+function saveDatabaseSync() {
+  if (!db) return;
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  try {
     const data = db.export();
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbPath, buffer);
+    console.log('✅ 数据库已保存到磁盘');
+  } catch (e) {
+    console.error('❌ 数据库写磁盘失败:', e.message);
   }
 }
+process.on('exit', saveDatabaseSync);
+process.on('SIGINT', () => { saveDatabaseSync(); process.exit(0); });
+process.on('SIGTERM', () => { saveDatabaseSync(); process.exit(0); });
 
 /**
  * 查询方法 - 返回所有行

@@ -19,10 +19,12 @@
       min-height: 100vh;
     }
     .layout {
+      display: flex;
       min-height: 100vh;
     }
     /* 侧边栏样式已由 components/sidebar.js 组件统一提供 */
     .main {
+      flex: 1;
       margin-left: 260px;
       padding: 24px 32px;
       overflow-y: auto;
@@ -413,6 +415,36 @@
       justify-content: center;
       color: #9ca3af;
     }
+    .trend-chart-container {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+    }
+    .trend-chart-container canvas {
+      width: 100%;
+      height: 280px;
+    }
+    .chart-legend {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #f3f4f6;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
     
     @media (max-width: 768px) {
       .sidebar {
@@ -685,8 +717,13 @@
       </div>
       <div class="chart-section">
         <div class="section-title">数据趋势</div>
-        <div class="chart-placeholder">
-          📊 趋势图表区域 - 集成图表库后显示数据可视化
+        <div class="trend-chart-container">
+          <canvas id="trendChart" width="900" height="280"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><span class="legend-color" style="background:#4f46e5"></span>花费</div>
+          <div class="legend-item"><span class="legend-color" style="background:#10b981"></span>销售额</div>
+          <div class="legend-item"><span class="legend-color" style="background:#f59e0b"></span>订单数</div>
         </div>
       </div>
       <div class="chart-section">
@@ -818,6 +855,7 @@
     // 初始化
     document.addEventListener('DOMContentLoaded', function() {
       loadReports();
+      drawTrendChart();
       
       // 点击背景关闭弹窗
       document.getElementById('detailModal').addEventListener('click', function(e) {
@@ -833,6 +871,150 @@
         }
       });
     });
+
+    // 绘制趋势图表
+    function drawTrendChart() {
+      const canvas = document.getElementById('trendChart');
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      
+      const width = rect.width;
+      const height = rect.height;
+      const padding = { top: 20, right: 30, bottom: 40, left: 60 };
+      const chartWidth = width - padding.left - padding.right;
+      const chartHeight = height - padding.top - padding.bottom;
+      
+      // 模拟30天数据
+      const days = 30;
+      const labels = [];
+      const spendData = [];
+      const salesData = [];
+      const ordersData = [];
+      
+      for (let i = 0; i < days; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - (days - 1 - i));
+        labels.push((date.getMonth() + 1) + '/' + date.getDate());
+        
+        // 模拟数据，带一些随机波动
+        const baseSpend = 3000 + Math.sin(i * 0.3) * 800;
+        spendData.push(baseSpend + Math.random() * 400 - 200);
+        
+        const baseSales = 12000 + Math.sin(i * 0.3 + 1) * 3000;
+        salesData.push(baseSales + Math.random() * 1500 - 750);
+        
+        const baseOrders = 100 + Math.sin(i * 0.3 + 2) * 25;
+        ordersData.push(Math.round(baseOrders + Math.random() * 15 - 7));
+      }
+      
+      // 清空画布
+      ctx.clearRect(0, 0, width, height);
+      
+      // 绘制网格线
+      ctx.strokeStyle = '#f3f4f6';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const y = padding.top + (chartHeight / 5) * i;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + chartWidth, y);
+        ctx.stroke();
+      }
+      
+      // 绘制X轴标签（每5天显示一个）
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      for (let i = 0; i < days; i += 5) {
+        const x = padding.left + (chartWidth / (days - 1)) * i;
+        ctx.fillText(labels[i], x, height - 15);
+      }
+      
+      // 绘制Y轴标签（销售额）
+      const maxSales = Math.max(...salesData) * 1.1;
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'right';
+      for (let i = 0; i <= 5; i++) {
+        const y = padding.top + (chartHeight / 5) * i;
+        const value = Math.round(maxSales * (1 - i / 5));
+        ctx.fillText('¥' + (value / 1000).toFixed(1) + 'k', padding.left - 8, y + 4);
+      }
+      
+      // 绘制花费折线
+      drawLine(ctx, spendData, maxSales, padding, chartWidth, chartHeight, '#4f46e5', 2);
+      
+      // 绘制销售额折线
+      drawLine(ctx, salesData, maxSales, padding, chartWidth, chartHeight, '#10b981', 2);
+      
+      // 绘制订单数柱状图（使用右侧Y轴）
+      const maxOrders = Math.max(...ordersData) * 1.5;
+      drawBars(ctx, ordersData, maxOrders, padding, chartWidth, chartHeight, '#f59e0b', days);
+      
+      // 绘制右侧Y轴标签（订单数）
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'left';
+      for (let i = 0; i <= 5; i++) {
+        const y = padding.top + (chartHeight / 5) * i;
+        const value = Math.round(maxOrders * (1 - i / 5));
+        ctx.fillText(value + '单', padding.left + chartWidth + 8, y + 4);
+      }
+    }
+    
+    // 绘制折线
+    function drawLine(ctx, data, maxValue, padding, chartWidth, chartHeight, color, lineWidth) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      
+      ctx.beginPath();
+      for (let i = 0; i < data.length; i++) {
+        const x = padding.left + (chartWidth / (data.length - 1)) * i;
+        const y = padding.top + chartHeight - (data[i] / maxValue) * chartHeight;
+        
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      
+      // 绘制数据点
+      ctx.fillStyle = color;
+      for (let i = 0; i < data.length; i += 5) {
+        const x = padding.left + (chartWidth / (data.length - 1)) * i;
+        const y = padding.top + chartHeight - (data[i] / maxValue) * chartHeight;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    
+    // 绘制柱状图
+    function drawBars(ctx, data, maxValue, padding, chartWidth, chartHeight, color, days) {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.3;
+      const barWidth = (chartWidth / days) * 0.6;
+      
+      for (let i = 0; i < data.length; i++) {
+        const x = padding.left + (chartWidth / days) * i + (chartWidth / days - barWidth) / 2;
+        const barHeight = (data[i] / maxValue) * chartHeight;
+        const y = padding.top + chartHeight - barHeight;
+        
+        ctx.fillRect(x, y, barWidth, barHeight);
+      }
+      ctx.globalAlpha = 1;
+    }
 
     // 加载报表数据
     async function loadReports() {
@@ -892,6 +1074,14 @@
       
       modalBody.innerHTML = content;
       modal.classList.add('show');
+
+      // DOM渲染完后绘制弹窗内图表
+      requestAnimationFrame(() => {
+        drawModalChart('modalPerformanceChart', 'performance');
+        drawModalChart('modalAcosChart', 'acos');
+        drawModalChart('modalSearchTermChart', 'searchterm');
+        drawModalChart('modalInvalidChart', 'invalid');
+      });
     }
     
     // 广告表现详情
@@ -926,7 +1116,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
             趋势图
           </div>
-          <div class="trend-chart">📈 近30天花费与销售趋势图</div>
+          <div class="trend-chart-container" style="padding:12px 0 0;">
+            <canvas id="modalPerformanceChart" height="200" style="width:100%;height:200px;display:block;"></canvas>
+          </div>
         </div>
         <div class="detail-section">
           <div class="detail-section-title">
@@ -981,7 +1173,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
             ACOS趋势
           </div>
-          <div class="trend-chart">📈 近30天ACOS变化趋势图</div>
+          <div class="trend-chart-container" style="padding:12px 0 0;">
+            <canvas id="modalAcosChart" height="200" style="width:100%;height:200px;display:block;"></canvas>
+          </div>
         </div>
         <div class="detail-section">
           <div class="detail-section-title">
@@ -1190,7 +1384,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z"/></svg>
             搜索词趋势
           </div>
-          <div class="trend-chart">📈 近30天搜索词点击与转化趋势图</div>
+          <div class="trend-chart-container" style="padding:12px 0 0;">
+            <canvas id="modalSearchTermChart" height="200" style="width:100%;height:200px;display:block;"></canvas>
+          </div>
         </div>
       `;
     }
@@ -1317,7 +1513,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
             无效流量趋势
           </div>
-          <div class="trend-chart">📈 近30天无效流量检测趋势图</div>
+          <div class="trend-chart-container" style="padding:12px 0 0;">
+            <canvas id="modalInvalidChart" height="200" style="width:100%;height:200px;display:block;"></canvas>
+          </div>
         </div>
         <div class="detail-section">
           <div class="detail-section-title">
@@ -1356,6 +1554,166 @@
       `;
     }
     
+    // 绘制弹窗内图表（通用，根据chartType生成不同数据）
+    function drawModalChart(canvasId, chartType) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      // 用 offsetWidth/offsetHeight 获取实际渲染宽高
+      const w = canvas.offsetWidth || canvas.parentElement.clientWidth || 500;
+      const h = 200;
+      canvas.width  = w * dpr;
+      canvas.height = h * dpr;
+      ctx.scale(dpr, dpr);
+
+      const days = 30;
+      const labels = [];
+      for (let i = 0; i < days; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - (days - 1 - i));
+        labels.push((d.getMonth() + 1) + '/' + d.getDate());
+      }
+
+      // 按类型生成数据 & 配色
+      let series = [];
+      if (chartType === 'performance') {
+        const spend  = Array.from({length:days}, (_,i) => 2800 + Math.sin(i*0.35)*700 + Math.random()*300);
+        const sales  = Array.from({length:days}, (_,i) => 11000 + Math.sin(i*0.35+1)*2500 + Math.random()*1000);
+        series = [
+          { data: spend, color: '#4f46e5', label: '花费(¥)' },
+          { data: sales, color: '#10b981', label: '销售额(¥)' },
+        ];
+      } else if (chartType === 'acos') {
+        const acos = Array.from({length:days}, (_,i) => 22 + Math.sin(i*0.4)*4 + Math.random()*2 - 1);
+        const target = Array.from({length:days}, () => 22.5);
+        series = [
+          { data: acos,   color: '#f59e0b', label: '实际ACOS(%)' },
+          { data: target, color: '#10b981', label: '目标ACOS(%)', dashed: true },
+        ];
+      } else if (chartType === 'searchterm') {
+        const clicks  = Array.from({length:days}, (_,i) => 400 + Math.sin(i*0.3)*100 + Math.random()*80);
+        const orders  = Array.from({length:days}, (_,i) => 60 + Math.sin(i*0.3+0.5)*15 + Math.random()*10);
+        series = [
+          { data: clicks, color: '#4f46e5', label: '点击量' },
+          { data: orders, color: '#10b981', label: '订单数' },
+        ];
+      } else if (chartType === 'invalid') {
+        const invalid = Array.from({length:days}, (_,i) => 15 + Math.sin(i*0.4)*6 + Math.random()*5);
+        series = [
+          { data: invalid, color: '#ef4444', label: '无效点击' },
+        ];
+      }
+
+      if (!series.length) return;
+
+      const pad = { top: 18, right: 20, bottom: 36, left: 52 };
+      const cw = w - pad.left - pad.right;
+      const ch = h - pad.top  - pad.bottom;
+
+      // 所有系列最大值
+      const allVals = series.flatMap(s => s.data);
+      const maxVal  = Math.max(...allVals) * 1.12;
+      const minVal  = Math.min(...allVals) * 0.88;
+      const range   = maxVal - minVal || 1;
+
+      // 背景
+      ctx.fillStyle = '#fafbfc';
+      ctx.fillRect(0, 0, w, h);
+
+      // 网格线
+      ctx.strokeStyle = '#f0f1f3';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (ch / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + cw, y);
+        ctx.stroke();
+      }
+
+      // Y轴标签
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = `${10 * (dpr > 1 ? 1 : 1)}px sans-serif`;
+      ctx.textAlign = 'right';
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (ch / 4) * i;
+        const val = maxVal - (range * i / 4);
+        const label = val >= 1000 ? (val/1000).toFixed(1)+'k' : val.toFixed(chartType==='acos'?1:0);
+        ctx.fillText(label, pad.left - 6, y + 3);
+      }
+
+      // X轴标签（每5天）
+      ctx.fillStyle = '#9ca3af';
+      ctx.textAlign = 'center';
+      for (let i = 0; i < days; i += 5) {
+        const x = pad.left + (cw / (days - 1)) * i;
+        ctx.fillText(labels[i], x, h - 10);
+      }
+
+      // 折线
+      series.forEach(s => {
+        ctx.save();
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.lineCap  = 'round';
+        if (s.dashed) ctx.setLineDash([5, 4]);
+
+        // 渐变填充
+        const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+        grad.addColorStop(0, s.color + '28');
+        grad.addColorStop(1, s.color + '00');
+
+        ctx.beginPath();
+        s.data.forEach((v, i) => {
+          const x = pad.left + (cw / (days - 1)) * i;
+          const y = pad.top + ch - ((v - minVal) / range) * ch;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // 填充
+        ctx.setLineDash([]);
+        const lastX = pad.left + cw;
+        const firstX = pad.left;
+        ctx.lineTo(lastX, pad.top + ch);
+        ctx.lineTo(firstX, pad.top + ch);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+
+        // 数据点（每5个）
+        s.data.forEach((v, i) => {
+          if (i % 5 !== 0) return;
+          const x = pad.left + (cw / (days - 1)) * i;
+          const y = pad.top + ch - ((v - minVal) / range) * ch;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = s.color;
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+      });
+
+      // 图例
+      let legendX = pad.left;
+      const legendY = h - 2;
+      series.forEach(s => {
+        ctx.fillStyle = s.color;
+        ctx.fillRect(legendX, legendY - 8, 12, 3);
+        ctx.fillStyle = '#6b7280';
+        ctx.textAlign = 'left';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(s.label, legendX + 15, legendY);
+        legendX += ctx.measureText(s.label).width + 30;
+      });
+    }
+
     // 关闭弹窗
     function closeModal() {
       document.getElementById('detailModal').classList.remove('show');

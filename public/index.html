@@ -38,6 +38,7 @@
 
     /* 布局 */
     .layout {
+      display: flex;
       min-height: 100vh;
     }
 
@@ -45,6 +46,7 @@
 
     /* 主内容区 - 左侧留出侧边栏宽度 */
     .main {
+      flex: 1;
       margin-left: 260px;
       padding: 24px;
       overflow-y: auto;
@@ -90,9 +92,27 @@
     /* 卡片网格 */
     .card-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
       margin-bottom: 24px;
+    }
+
+    @media (max-width: 1400px) {
+      .card-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .card-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .card {

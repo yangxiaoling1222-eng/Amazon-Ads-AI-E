@@ -92,7 +92,7 @@ function buildAdAnalysisPrompt(data) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Function Calling 系统提示（强调行动导向）
+// Function Calling 系统提示（强调行动导向，无废话）
 // ─────────────────────────────────────────────────────────────────
 SYSTEM_PROMPTS.agent = `你是一个亚马逊广告 AI 操作助手，可以直接操控广告账户。你有以下能力：
 - 查看广告活动、关键词数据
@@ -104,11 +104,16 @@ SYSTEM_PROMPTS.agent = `你是一个亚马逊广告 AI 操作助手，可以直�
 - 根据目标 ACoS 智能调价
 
 **重要规则**：
-1. 收到操作指令时，优先调用工具执行，而非仅给建议
-2. 涉及删除、暂停、大幅调价（>20%）的操作，先用 dryRun=true 预览，再询问用户确认
-3. 执行完毕后，用简洁中文汇报结果
-4. 如果指令模糊（如"帮我优化广告"），先询问具体目标（ACoS 目标、操作范围等）
-5. 始终用中文回复`;
+1. **直接回答，不加开场白**。不要用"您好！""我能帮您做以下事情"等套话，直接回答用户问题
+2. 收到操作指令时，优先调用工具执行，而非仅给建议
+3. 涉及删除、暂停、大幅调价（>20%）的操作，先用 dryRun=true 预览，再询问用户确认
+4. 执行完毕后，用简洁中文汇报结果
+5. 如果指令模糊（如"帮我优化广告"），先询问具体目标（ACoS 目标、操作范围等）
+6. 始终用中文回复
+7. 如果用户是追问或继续之前的对话，直接继续，不要重复介绍功能
+8. **【关键】执行完广告操作后，必须在回复末尾添加任务记录标记**，格式如下：
+   【创建任务:操作概述|详细说明本次执行了哪些操作、调整了哪些参数、预计效果等】
+   例如：【创建任务:降低高ACoS活动预算|将 AC-001 活动日预算从 $50 降至 $40，ACoS 从 48% 降至目标 35%】`;
 
 // ─────────────────────────────────────────────────────────────────
 // 核心发送函数
@@ -116,37 +121,67 @@ SYSTEM_PROMPTS.agent = `你是一个亚马逊广告 AI 操作助手，可以直�
 async function sendChatRequest({ apiKey, baseUrl, model, messages, tools, toolChoice, maxTokens = 2000, timeout = 60000 }) {
   const url = `${baseUrl}/chat/completions`;
 
-  try {
+  // ── 内部执行单次请求 ──────────────────────────────────────────
+  async function doRequest(withTools) {
     const body = { model, messages, max_tokens: maxTokens };
-    if (tools && tools.length)  body.tools       = tools;
-    if (toolChoice)             body.tool_choice  = toolChoice;
+    if (withTools && tools && tools.length)  body.tools      = tools;
+    if (withTools && toolChoice)             body.tool_choice = toolChoice;
 
-    const res = await axios.post(url,
-      body,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'http://localhost:3000'
-        },
-        timeout
-      }
-    );
+    const res = await axios.post(url, body, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'http://localhost:3000'
+      },
+      timeout
+    });
 
-    const choice  = res.data.choices?.[0];
+    // ⚠️ 检查响应是否包含错误（OpenRouter 等可能返回 200 但 body 是错误对象）
+    if (res.data?.error) {
+      const errMsg = res.data.error.message || JSON.stringify(res.data.error);
+      return { success: false, error: errMsg, rawResponse: res.data };
+    }
+
+    // ⚠️ 检查是否有效的 chat completion 格式
+    if (!res.data?.choices || !Array.isArray(res.data.choices) || !res.data.choices[0]) {
+      return { success: false, error: '无效的响应格式', rawResponse: res.data };
+    }
+
+    const choice  = res.data.choices[0];
     const message = choice?.message;
     const content = message?.content;
 
-    // 如果 AI 返回了 tool_calls，透传给调用方
     if (message?.tool_calls?.length) {
       return { success: true, toolCalls: message.tool_calls, response: content };
     }
+    return { success: true, response: content, noTools: !withTools };
+  }
 
-    return { success: true, response: content };
+  try {
+    // 第一次：带 tools 尝试
+    return await doRequest(true);
   } catch (err) {
+    const status = err.response?.status;
     const errMsg = err.response?.data?.error?.message || err.message || '请求失败';
+
+    // 如果是 500 且带了 tools，自动降级：不带 tools 重试
+    // 通常原因：免费 Key 不支持 Function Calling / 模型不支持 tools
+    if (status === 500 && tools && tools.length) {
+      console.warn('[AI Service] tools 调用返回 500，降级为普通对话（不传 tools）...');
+      try {
+        const fallback = await doRequest(false);
+        return { ...fallback, toolsFallback: true };
+      } catch (err2) {
+        const msg2 = err2.response?.data?.error?.message || err2.message || '请求失败';
+        console.error('[AI Service Fallback Error]', msg2);
+        if (err2.response?.data) {
+          console.error('[AI Service Fallback Detail]', JSON.stringify(err2.response.data).slice(0, 2000));
+        }
+        return { success: false, error: msg2, errorDetail: err2.response?.data || null };
+      }
+    }
+
     console.error('[AI Service Error]', errMsg);
-    // 详细日志：输出完整响应体，方便排查 OpenRouter 错误
     if (err.response?.data) {
       console.error('[AI Service Error Detail]', JSON.stringify(err.response.data).slice(0, 2000));
     } else if (err.response) {
@@ -167,22 +202,90 @@ class AIService {
 
   // ── 连接测试 ────────────────────────────────────────────────
   async testOpenAI(apiKey, model = 'gpt-4o-mini') {
-    return sendChatRequest({
+    const result = await sendChatRequest({
       apiKey,
       baseUrl: 'https://api.openai.com/v1',
       model,
       messages: [{ role: 'user', content: 'Reply with OK' }],
       maxTokens: 10
     });
+    return this._checkModelAvailability(result);
   }
 
   async testOpenRouter(apiKey, baseUrl = 'https://openrouter.ai/api/v1', model = 'openai/gpt-4o-mini') {
-    return sendChatRequest({
+    const result = await sendChatRequest({
       apiKey, baseUrl, model,
       messages: [{ role: 'user', content: 'Hi' }],
       maxTokens: 10,
       timeout: 30000
     });
+
+    // 如果 API 返回了内容但包含错误信息（如区域限制），应视为失败
+    if (result.success && result.response) {
+      const lowerResp = result.response.toLowerCase();
+      if (lowerResp.includes('not available') ||
+          lowerResp.includes('region') ||
+          lowerResp.includes('unavailable') ||
+          lowerResp.includes('access denied') ||
+          lowerResp.includes('forbidden') ||
+          lowerResp.includes('not supported')) {
+        return {
+          success: false,
+          error: `模型不可用：${result.response}`,
+          modelUnavailable: true
+        };
+      }
+    }
+
+    return result;
+  }
+
+  async testSiliconFlow(apiKey, model = 'Qwen/Qwen3-8B') {
+    const result = await sendChatRequest({
+      apiKey,
+      baseUrl: 'https://api.siliconflow.cn/v1',
+      model,
+      messages: [{ role: 'user', content: 'Hi' }],
+      maxTokens: 10,
+      timeout: 30000
+    });
+    return this._checkModelAvailability(result);
+  }
+
+  async testCustom(apiKey, baseUrl = 'https://api.openai.com/v1', model = 'gpt-4o-mini') {
+    const result = await sendChatRequest({
+      apiKey, baseUrl, model,
+      messages: [{ role: 'user', content: 'Hi' }],
+      maxTokens: 10,
+      timeout: 30000
+    });
+    return this._checkModelAvailability(result);
+  }
+
+  /**
+   * 检查模型响应是否包含不可用/区域限制等错误信息
+   * @private
+   */
+  _checkModelAvailability(result) {
+    if (!result.success || !result.response) return result;
+
+    const lowerResp = result.response.toLowerCase();
+    const unavailablePatterns = [
+      'not available', 'region', 'unavailable', 'access denied',
+      'forbidden', 'not supported', 'not accessible', 'restricted',
+      'not found', 'invalid model', 'model not found'
+    ];
+
+    const isUnavailable = unavailablePatterns.some(p => lowerResp.includes(p));
+    if (isUnavailable) {
+      return {
+        success: false,
+        error: `模型不可用：${result.response}`,
+        modelUnavailable: true
+      };
+    }
+
+    return result;
   }
 
   // ── 单轮对话（无历史）────────────────────────────────────────
@@ -332,6 +435,7 @@ class AIService {
 
     const executedTools = [];
     let round = 0;
+    let createdTaskId = null;   // 记录 AI 创建的任务 ID
 
     // Function Calling 循环（AI → tool → AI → tool → ... → 最终回复）
     while (round < maxToolRounds) {
@@ -357,7 +461,8 @@ class AIService {
           success: true,
           response: result.response,
           executedTools,
-          rounds: round
+          rounds: round,
+          taskId: createdTaskId
         };
       }
 
@@ -381,6 +486,11 @@ class AIService {
         const toolResult = await ToolExecutor.execute(toolName, toolArgs);
         executedTools.push({ tool: toolName, args: toolArgs, result: toolResult });
 
+        // 记录创建的任务 ID
+        if (toolName === 'create_task' && toolResult.success && toolResult.taskId) {
+          createdTaskId = toolResult.taskId;
+        }
+
         // 把工具执行结果加入对话
         messages.push({
           role:         'tool',
@@ -398,7 +508,8 @@ class AIService {
         executedTools.map(t => `- ${t.tool}: ${JSON.stringify(t.result).slice(0, 100)}`).join('\n'),
       executedTools,
       rounds: round,
-      warning: '已达最大工具调用轮次'
+      warning: '已达最大工具调用轮次',
+      taskId: createdTaskId
     };
   }
 

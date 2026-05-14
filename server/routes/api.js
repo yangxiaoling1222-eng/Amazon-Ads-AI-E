@@ -628,6 +628,19 @@ router.post('/config/test', async (req, res) => {
           config.model || 'openai/gpt-4o-mini'
         );
         break;
+      case 'siliconflow':
+        result = await aiService.testSiliconFlow(
+          config.apiKey,
+          config.model || 'Qwen/Qwen3-8B'
+        );
+        break;
+      case 'custom':
+        result = await aiService.testCustom(
+          config.apiKey,
+          config.baseUrl || 'https://api.openai.com/v1',
+          config.model || 'gpt-4o-mini'
+        );
+        break;
       default:
         return res.status(400).json({ success: false, error: '不支持的 API 类型' });
     }
@@ -741,8 +754,8 @@ router.post('/ai/analyze-task', async (req, res) => {
 只返回JSON数组，不要包含其他文字。`;
 
     // 从数据库获取 AI 配置
-    const configs = db.query('SELECT config_key, config_value FROM api_config WHERE config_key IN (?, ?, ?, ?)',
-      ['openai', 'openrouter', 'lingxing', 'amazon']);
+    const configs = db.query('SELECT config_key, config_value FROM api_config WHERE config_key IN (?, ?, ?, ?, ?, ?)',
+      ['aiProvider', 'siliconflow', 'openrouter', 'openai', 'custom', 'amazon']);
 
     let aiConfig = {};
     configs.forEach(c => {
@@ -751,17 +764,26 @@ router.post('/ai/analyze-task', async (req, res) => {
       } catch (e) {}
     });
 
-    // 确定使用哪个 AI 配置
+    // 确定使用哪个 AI 配置（由 aiProvider 决定）
     let apiKey, baseUrl, selectedModel;
+    const sel = aiConfig.aiProvider || 'siliconflow';
 
-    if (aiConfig.openrouter && aiConfig.openrouter.apiKey) {
+    if (sel === 'siliconflow' && aiConfig.siliconflow?.apiKey) {
+      apiKey = aiConfig.siliconflow.apiKey;
+      baseUrl = 'https://api.siliconflow.cn/v1';
+      selectedModel = aiConfig.siliconflow.model || 'Qwen/Qwen3-8B';
+    } else if (sel === 'openrouter' && aiConfig.openrouter?.apiKey) {
       apiKey = aiConfig.openrouter.apiKey;
       baseUrl = aiConfig.openrouter.baseUrl || 'https://openrouter.ai/api/v1';
       selectedModel = aiConfig.openrouter.model || 'openrouter/free';
-    } else if (aiConfig.openai && aiConfig.openai.apiKey) {
+    } else if (sel === 'openai' && aiConfig.openai?.apiKey) {
       apiKey = aiConfig.openai.apiKey;
       baseUrl = 'https://api.openai.com/v1';
       selectedModel = aiConfig.openai.model || 'gpt-4o-mini';
+    } else if (sel === 'custom' && aiConfig.custom?.apiKey) {
+      apiKey = aiConfig.custom.apiKey;
+      baseUrl = aiConfig.custom.baseUrl || 'https://api.openai.com/v1';
+      selectedModel = aiConfig.custom.model || 'gpt-4o-mini';
     } else {
       apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
       baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
@@ -852,9 +874,9 @@ router.post('/ai/query', async (req, res) => {
     console.log('模型:', model);
 
     // 从数据库获取 AI 配置
-    const configs = db.query('SELECT config_key, config_value FROM api_config WHERE config_key IN (?, ?, ?, ?)', 
-      ['openai', 'openrouter', 'lingxing', 'amazon']);
-    
+    const configs = db.query('SELECT config_key, config_value FROM api_config WHERE config_key IN (?, ?, ?, ?, ?, ?)',
+      ['aiProvider', 'siliconflow', 'openrouter', 'openai', 'custom', 'amazon']);
+
     let aiConfig = {};
     configs.forEach(c => {
       try {
@@ -862,19 +884,27 @@ router.post('/ai/query', async (req, res) => {
       } catch (e) {}
     });
 
-    // 确定使用哪个 AI 配置
+    // 确定使用哪个 AI 配置（由 aiProvider 决定）
     let apiKey, baseUrl, selectedModel;
-    
-    if (aiConfig.openrouter && aiConfig.openrouter.apiKey) {
+    const sel = aiConfig.aiProvider || 'siliconflow';
+
+    if (sel === 'siliconflow' && aiConfig.siliconflow?.apiKey) {
+      apiKey = aiConfig.siliconflow.apiKey;
+      baseUrl = 'https://api.siliconflow.cn/v1';
+      selectedModel = model || aiConfig.siliconflow.model || 'Qwen/Qwen3-8B';
+    } else if (sel === 'openrouter' && aiConfig.openrouter?.apiKey) {
       apiKey = aiConfig.openrouter.apiKey;
       baseUrl = aiConfig.openrouter.baseUrl || 'https://openrouter.ai/api/v1';
       selectedModel = model || aiConfig.openrouter.model || 'openrouter/free';
-    } else if (aiConfig.openai && aiConfig.openai.apiKey) {
+    } else if (sel === 'openai' && aiConfig.openai?.apiKey) {
       apiKey = aiConfig.openai.apiKey;
       baseUrl = 'https://api.openai.com/v1';
       selectedModel = model || aiConfig.openai.model || 'gpt-4o-mini';
+    } else if (sel === 'custom' && aiConfig.custom?.apiKey) {
+      apiKey = aiConfig.custom.apiKey;
+      baseUrl = aiConfig.custom.baseUrl || 'https://api.openai.com/v1';
+      selectedModel = model || aiConfig.custom.model || 'gpt-4o-mini';
     } else {
-      // 使用默认配置（如果有环境变量）
       apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
       baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
       selectedModel = model || process.env.OPENROUTER_DEFAULT_MODEL || 'openrouter/free';

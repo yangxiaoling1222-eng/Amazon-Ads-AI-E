@@ -25,21 +25,29 @@
       min-height: 100vh;
       transition: margin-left 0.3s;
     }
+    /* SPA iframe 模式：侧边栏由父页面统一渲染，子页面不需要 margin */
+    body.spa-iframe .main { margin-left: 0; }
+    body.spa-iframe .layout { display: block; }
 
     .page-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 28px;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 16px;
     }
-    .page-title { font-size: 24px; font-weight: 700; color: #1a1d26; }
+    .page-title { 
+      font-size: 26px; 
+      font-weight: 700; 
+      color: #1a1d26;
+      letter-spacing: -0.5px;
+    }
 
     /* ============ 按钮 ============ */
     .btn {
-      padding: 10px 20px;
-      border-radius: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
@@ -50,8 +58,16 @@
       transition: all 0.2s;
       white-space: nowrap;
     }
-    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
-    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      color: #fff; 
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    .btn-primary:hover { 
+      opacity: 0.9; 
+      transform: translateY(-1px); 
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
     .btn-outline { background: #fff; border: 1px solid #e5e7eb; color: #374151; }
     .btn-outline:hover { background: #f9fafb; border-color: #d1d5db; }
     .btn-danger { background: #ef4444; color: #fff; }
@@ -66,10 +82,10 @@
     /* ============ Tab 导航 ============ */
     .tab-nav {
       display: flex;
-      gap: 4px;
-      background: #fff;
+      gap: 8px;
+      background: #f9fafb;
       border-radius: 12px 12px 0 0;
-      padding: 8px;
+      padding: 12px 16px;
       border: 1px solid #e5e7eb;
       border-bottom: none;
       overflow-x: auto;
@@ -83,11 +99,11 @@
     .tab-btn {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 10px 16px;
+      gap: 8px;
+      padding: 10px 18px;
       border: none;
       background: transparent;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 14px;
       font-weight: 500;
       color: #6b7280;
@@ -95,12 +111,25 @@
       transition: all 0.2s;
       white-space: nowrap;
       flex-shrink: 0;
+      position: relative;
     }
     .tab-btn:hover { background: #f3f4f6; color: #374151; }
     .tab-btn.active {
+      background: #fff;
+      color: #667eea;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      font-weight: 600;
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 3px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      border-radius: 2px;
     }
     .tab-btn svg { flex-shrink: 0; }
 
@@ -110,7 +139,7 @@
       border-radius: 0 0 12px 12px;
       border: 1px solid #e5e7eb;
       border-top: none;
-      padding: 24px;
+      padding: 32px;
       min-height: 400px;
     }
     .tab-panel { display: none; animation: fadeIn 0.25s ease; }
@@ -122,47 +151,49 @@
 
     /* 面板标题 */
     .panel-title {
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 600;
       color: #1a1d26;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f3f4f6;
     }
     .panel-title svg { color: #667eea; flex-shrink: 0; }
 
     /* ============ 通用设置项 ============ */
-    .settings-section { margin-bottom: 24px; }
+    .settings-section { margin-bottom: 28px; }
     .section-header {
-      padding: 14px 20px;
+      padding: 16px 24px;
       border-bottom: 1px solid #e5e7eb;
       background: #fafafa;
-      border-radius: 10px 10px 0 0;
+      border-radius: 12px 12px 0 0;
     }
     .section-header h3 {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       color: #1a1d26;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
     .section-header h3 svg { color: #667eea; }
-    .section-body { padding: 8px 20px 4px; background: #fafafa; border-radius: 0 0 10px 10px; }
+    .section-body { padding: 12px 24px 8px; background: #fafafa; border-radius: 0 0 12px 12px; }
 
     .setting-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 14px 0;
+      padding: 16px 0;
       border-bottom: 1px solid #f3f4f6;
-      gap: 16px;
+      gap: 20px;
     }
     .setting-item:last-child { border-bottom: none; }
     .setting-info { flex: 1; min-width: 0; }
-    .setting-label { font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 3px; }
-    .setting-desc { font-size: 12px; color: #9ca3af; }
+    .setting-label { font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px; }
+    .setting-desc { font-size: 13px; color: #9ca3af; line-height: 1.5; }
     .setting-control { flex-shrink: 0; }
 
     /* ============ 开关 ============ */
@@ -182,13 +213,13 @@
     input:checked + .slider:before { transform: translateX(20px); }
 
     /* ============ 输入框 ============ */
-    .form-group { display: flex; flex-direction: column; gap: 5px; }
-    .form-label { font-size: 13px; font-weight: 500; color: #374151; }
+    .form-group { display: flex; flex-direction: column; gap: 8px; }
+    .form-label { font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 2px; }
     .input {
       width: 100%;
-      padding: 10px 12px;
+      padding: 12px 14px;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 14px;
       background: #fff;
       color: #1a1d26;
@@ -196,42 +227,50 @@
     }
     .input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
     .input::placeholder { color: #9ca3af; }
-    .input-group { display: flex; align-items: center; gap: 8px; }
+    .input-group { display: flex; align-items: center; gap: 10px; }
     .input-group .input { width: 120px; }
     .input-suffix { color: #9ca3af; font-size: 13px; white-space: nowrap; }
 
     /* ============ 下拉框 ============ */
     .select {
-      padding: 10px 12px;
+      padding: 12px 14px;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 14px;
       background: #fff;
       color: #1a1d26;
       min-width: 150px;
       max-width: 100%;
       cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .select:focus { outline: none; border-color: #667eea; }
+    .select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
 
     /* ============ API 配置卡片 ============ */
     .api-config-item {
-      padding: 20px;
+      padding: 24px;
       background: #fff;
-      border-radius: 10px;
-      margin-bottom: 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
       border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: box-shadow 0.2s;
+    }
+    .api-config-item:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
     .api-config-item:last-child { margin-bottom: 0; }
     .api-title {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 600;
       color: #1a1d26;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #f3f4f6;
     }
     .api-title svg { color: #667eea; flex-shrink: 0; }
 
@@ -239,12 +278,12 @@
     .form-grid-2 {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
+      gap: 20px;
     }
     .form-grid-2-1 {
       display: grid;
       grid-template-columns: 2fr 1fr;
-      gap: 16px;
+      gap: 20px;
     }
     .form-row-with-btn {
       display: flex;
@@ -258,21 +297,78 @@
     .data-source-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
+      gap: 16px;
     }
     .data-source-option {
       transition: all 0.2s;
       border: 2px solid transparent;
+      padding: 20px !important;
+      border-radius: 12px !important;
     }
-    .data-source-option:hover { border-color: #667eea !important; }
+    .data-source-option:hover { border-color: #667eea !important; transform: translateY(-2px); }
     .data-source-option.active {
       border-color: #10b981 !important;
       background: rgba(16,185,129,0.05) !important;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.15);
     }
     .data-source-option.inactive { opacity: 0.5; }
     .source-indicator.active {
       background: #10b981 !important;
       box-shadow: 0 0 8px rgba(16,185,129,0.5);
+    }
+
+    /* ============ AI Provider 选择器 ============ */
+    .ai-provider-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 640px) {
+      .ai-provider-grid { grid-template-columns: 1fr; }
+    }
+    .ai-provider-card {
+      padding: 14px 16px;
+      background: #fff;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ai-provider-card:hover { border-color: #667eea; transform: translateY(-1px); }
+    .ai-provider-card.active {
+      border-color: #667eea;
+      background: rgba(102,126,234,0.06);
+      box-shadow: 0 4px 12px rgba(102,126,234,0.15);
+    }
+    .ai-provider-card .provider-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .ai-provider-card .provider-info { flex: 1; min-width: 0; }
+    .ai-provider-card .provider-name { font-weight: 600; font-size: 13px; color: #1a1d26; }
+    .ai-provider-card .provider-desc { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .ai-provider-card .provider-check {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid #d1d5db;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .ai-provider-card.active .provider-check {
+      background: #667eea;
+      border-color: #667eea;
+    }
+    .ai-provider-card.active .provider-check::after {
+      content: '✓';
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
     }
 
     /* API 状态点 */
@@ -284,6 +380,10 @@
 
     /* API配置块禁用 */
     .api-config-item.disabled { opacity: 0.45; pointer-events: none; }
+
+    /* 数据源 Tab 面板 */
+    .data-source-panel { display: none; animation: fadeIn 0.25s ease; }
+    .data-source-panel.active { display: block; }
 
     /* 店铺列表 */
     .store-list { margin-top: 16px; }
@@ -381,6 +481,12 @@
   <div class="layout">
     <div id="sidebar"></div>
     <main class="main">
+    <script>
+      // SPA iframe 模式：标记 body，让 CSS 去掉左侧 margin
+      if (window.self !== window.top) {
+        document.body.classList.add('spa-iframe');
+      }
+    </script>
       <div class="page-header">
         <h1 class="page-title">系统设置</h1>
         <button class="btn btn-primary" onclick="saveSettings()">
@@ -463,87 +569,152 @@
               </div>
             </div>
             
-            <!-- 领星ERP配置 -->
-            <div class="api-config-item" id="lingxing-config">
-              <div class="api-title">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                领星ERP API
-                <span class="status-dot" id="lingxing-status"></span>
-              </div>
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label class="form-label">API Key</label>
-                  <input type="password" class="input" id="lingxing-api-key" placeholder="请输入API Key">
+            <!-- 领星ERP配置面板 -->
+            <div class="data-source-panel active" id="lingxing-panel">
+              <div class="api-config-item" id="lingxing-config">
+                <div class="api-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                  领星ERP API
+                  <span class="status-dot" id="lingxing-status"></span>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">API Secret</label>
-                  <input type="password" class="input" id="lingxing-api-secret" placeholder="请输入API Secret">
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input type="password" class="input" id="lingxing-api-key" placeholder="请输入API Key">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">API Secret</label>
+                    <input type="password" class="input" id="lingxing-api-secret" placeholder="请输入API Secret">
+                  </div>
                 </div>
-              </div>
-              <div class="form-row-with-btn">
-                <div class="form-group">
-                  <label class="form-label">接口地址</label>
-                  <input type="text" class="input" id="lingxing-base-url" placeholder="https://api.lingxing.com" value="https://api.lingxing.com">
+                <div class="form-row-with-btn">
+                  <div class="form-group">
+                    <label class="form-label">接口地址</label>
+                    <input type="text" class="input" id="lingxing-base-url" placeholder="https://api.lingxing.com" value="https://api.lingxing.com">
+                  </div>
+                  <button class="btn btn-outline" onclick="testConnection('lingxing')">测试连接</button>
                 </div>
-                <button class="btn btn-outline" onclick="testConnection('lingxing')">测试连接</button>
               </div>
             </div>
             
-            <!-- 亚马逊广告API配置 -->
-            <div class="api-config-item" id="amazon-config">
-              <div class="api-title">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.98 6.23l-.91-1.08-5.29 3.44-3.44-5.29-1.09.91 3.44 5.29-3.44 5.29 1.09.91 5.29-3.44 3.44 5.29.91-1.08-3.44-5.29 3.44-5.29z"/></svg>
-                亚马逊广告API
-                <span class="status-dot" id="amazon-status"></span>
-              </div>
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label class="form-label">Client ID</label>
-                  <input type="text" class="input" id="amazon-client-id" placeholder="请输入Client ID">
+            <!-- 亚马逊广告API配置面板 -->
+            <div class="data-source-panel" id="amazon-panel">
+              <div class="api-config-item" id="amazon-config">
+                <div class="api-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.98 6.23l-.91-1.08-5.29 3.44-3.44-5.29-1.09.91 3.44 5.29-3.44 5.29 1.09.91 5.29-3.44 3.44 5.29.91-1.08-3.44-5.29 3.44-5.29z"/></svg>
+                  亚马逊广告API
+                  <span class="status-dot" id="amazon-status"></span>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Client Secret</label>
-                  <input type="password" class="input" id="amazon-client-secret" placeholder="请输入Client Secret">
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label">Client ID</label>
+                    <input type="text" class="input" id="amazon-client-id" placeholder="请输入Client ID">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Client Secret</label>
+                    <input type="password" class="input" id="amazon-client-secret" placeholder="请输入Client Secret">
+                  </div>
                 </div>
-              </div>
-              <div class="form-row-with-btn">
-                <div class="form-group">
-                  <label class="form-label">Refresh Token</label>
-                  <input type="password" class="input" id="amazon-refresh-token" placeholder="请输入Refresh Token">
+                <div class="form-row-with-btn">
+                  <div class="form-group">
+                    <label class="form-label">Refresh Token</label>
+                    <input type="password" class="input" id="amazon-refresh-token" placeholder="请输入Refresh Token">
+                  </div>
+                  <button class="btn btn-outline" onclick="testConnection('amazon')">测试连接</button>
                 </div>
-                <button class="btn btn-outline" onclick="testConnection('amazon')">测试连接</button>
               </div>
             </div>
             
-            <!-- OpenAI API配置 -->
-            <div class="api-config-item">
+            <!-- AI 模型供应商选择 -->
+            <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%); padding: 20px; border-radius: 10px; margin-bottom: 16px;">
+              <div style="font-size: 14px; font-weight: 600; color: #1a1d26; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:#667eea"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.72 1.21L11 13V8h1.5z"/></svg>
+                选择 AI 模型供应商
+                <span style="font-size: 12px; font-weight: 400; color: #9ca3af;">（只能选择一个，选中后填写对应配置）</span>
+              </div>
+              <div class="ai-provider-grid" id="aiProviderGrid">
+                <!-- SiliconFlow -->
+                <div class="ai-provider-card" id="card-siliconflow" onclick="switchAiProvider('siliconflow')">
+                  <div class="provider-icon" style="background:#d1fae5;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#10b981"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/></svg>
+                  </div>
+                  <div class="provider-info">
+                    <div class="provider-name">SiliconFlow</div>
+                    <div class="provider-desc">国内可用 · 免费额度大 · ⭐推荐</div>
+                  </div>
+                  <div class="provider-check"></div>
+                </div>
+                <!-- OpenRouter -->
+                <div class="ai-provider-card" id="card-openrouter" onclick="switchAiProvider('openrouter')">
+                  <div class="provider-icon" style="background:#ede9fe;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  </div>
+                  <div class="provider-info">
+                    <div class="provider-name">OpenRouter</div>
+                    <div class="provider-desc">100+ 模型可选 · 支持免费模型</div>
+                  </div>
+                  <div class="provider-check"></div>
+                </div>
+                <!-- OpenAI -->
+                <div class="ai-provider-card" id="card-openai" onclick="switchAiProvider('openai')">
+                  <div class="provider-icon" style="background:#dbeafe;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#2563eb"><circle cx="12" cy="12" r="10"/></svg>
+                  </div>
+                  <div class="provider-info">
+                    <div class="provider-name">OpenAI（官方）</div>
+                    <div class="provider-desc">GPT-4o / GPT-4o Mini / GPT-3.5</div>
+                  </div>
+                  <div class="provider-check"></div>
+                </div>
+                <!-- 自定义（OpenAI兼容接口） -->
+                <div class="ai-provider-card" id="card-custom" onclick="switchAiProvider('custom')">
+                  <div class="provider-icon" style="background:#fef3c7;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#d97706"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+                  </div>
+                  <div class="provider-info">
+                    <div class="provider-name">自定义接口</div>
+                    <div class="provider-desc">OpenAI 兼容接口 · 支持自部署模型</div>
+                  </div>
+                  <div class="provider-check"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SiliconFlow 配置（默认显示） -->
+            <div class="api-config-item" id="cfg-siliconflow" style="border: 1px dashed #34d399; background: linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(5,150,105,0.05) 100%);">
               <div class="api-title">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                OpenAI API
-                <span class="status-dot" id="openai-status"></span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:#10b981"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/></svg>
+                SiliconFlow API
+                <span class="status-dot" id="siliconflow-status"></span>
               </div>
               <div class="form-grid-2-1">
                 <div class="form-group">
                   <label class="form-label">API Key</label>
-                  <input type="password" class="input" id="openai-api-key" placeholder="sk-...">
+                  <input type="password" class="input" id="siliconflow-api-key" placeholder="sk-...">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">模型</label>
-                  <select class="select" id="openai-model">
-                    <option value="gpt-4o">GPT-4o</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <label class="form-label">模型 <button onclick="refreshSFModelList()" style="margin-left:8px;padding:2px 8px;font-size:11px;border-radius:4px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#10b981;">🔄 刷新列表</button></label>
+                  <select class="select" id="siliconflow-model">
+                    <option value="Qwen/Qwen3-8B">Qwen/Qwen3-8B（推荐）</option>
+                    <option value="Qwen/Qwen3-30B-A3B">Qwen/Qwen3-30B-A3B</option>
+                    <option value="Qwen/Qwen3-235B-A22B">Qwen/Qwen3-235B-A22B（最强）</option>
+                    <option value="deepseek-ai/DeepSeek-V3">deepseek-ai/DeepSeek-V3</option>
+                    <option value="deepseek-ai/DeepSeek-R1">deepseek-ai/DeepSeek-R1</option>
+                    <option value="THUDM/glm-4-9b-chat">THUDM/glm-4-9b-chat</option>
                   </select>
+                  <div id="sf-model-status" style="font-size:11px;color:#6b7280;margin-top:4px;"></div>
                 </div>
               </div>
-              <div style="margin-top: 14px;">
-                <button class="btn btn-outline" onclick="testConnection('openai')">测试连接</button>
+              <div style="margin-top: 12px; padding: 10px 12px; background: #d1fae5; border-radius: 6px; font-size: 12px; color: #065f46;">
+                💡 新用户注册赠送 <strong>2000万 Token</strong> 免费额度，完整支持 Function Calling。地址：<strong>api.siliconflow.cn</strong>
+              </div>
+              <div style="margin-top: 12px;">
+                <button class="btn btn-outline" onclick="testConnection('siliconflow')">测试连接</button>
               </div>
             </div>
 
-            <!-- OpenRouter API配置 -->
-            <div class="api-config-item" style="border: 1px dashed #c4b5fd; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);">
+            <!-- OpenRouter 配置 -->
+            <div class="api-config-item" id="cfg-openrouter" style="border: 1px dashed #c4b5fd; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); display:none;">
               <div class="api-title">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.98 6.23l-.91-1.08-5.29 3.44-3.44-5.29-1.09.91 3.44 5.29-3.44 5.29 1.09.91 5.29-3.44 3.44 5.29.91-1.08-3.44-5.29 3.44-5.29z"/></svg>
                 OpenRouter API
@@ -568,10 +739,68 @@
                   <label class="form-label">接口地址</label>
                   <input type="text" class="input" id="openrouter-base-url" placeholder="https://openrouter.ai/api/v1" value="https://openrouter.ai/api/v1">
                 </div>
-                <button class="btn btn-outline" onclick="testConnection('openrouter')">测试连接</button>
               </div>
               <div style="margin-top: 12px; padding: 10px 12px; background: #d1fae5; border-radius: 6px; font-size: 12px; color: #065f46;">
                 💡 推荐免费模型：deepseek/deepseek-chat-v3-0324:free
+              </div>
+              <div style="margin-top: 12px;">
+                <button class="btn btn-outline" onclick="testConnection('openrouter')">测试连接</button>
+              </div>
+            </div>
+
+            <!-- OpenAI 配置 -->
+            <div class="api-config-item" id="cfg-openai" style="display:none;">
+              <div class="api-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#2563eb"/></svg>
+                OpenAI API（官方）
+                <span class="status-dot" id="openai-status"></span>
+              </div>
+              <div class="form-grid-2-1">
+                <div class="form-group">
+                  <label class="form-label">API Key</label>
+                  <input type="password" class="input" id="openai-api-key" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">模型</label>
+                  <select class="select" id="openai-model">
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-top: 12px;">
+                <button class="btn btn-outline" onclick="testConnection('openai')">测试连接</button>
+              </div>
+            </div>
+
+            <!-- 自定义接口配置 -->
+            <div class="api-config-item" id="cfg-custom" style="border: 1px dashed #f59e0b; background: linear-gradient(135deg, rgba(245,158,11,0.05) 0%, rgba(217,119,6,0.05) 100%); display:none;">
+              <div class="api-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:#d97706"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+                自定义接口（OpenAI 兼容）
+                <span class="status-dot" id="custom-status"></span>
+              </div>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label">接口地址</label>
+                <input type="text" class="input" id="custom-base-url" placeholder="https://your-endpoint/v1">
+              </div>
+              <div class="form-grid-2-1">
+                <div class="form-group">
+                  <label class="form-label">API Key</label>
+                  <input type="password" class="input" id="custom-api-key" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">模型</label>
+                  <input type="text" class="input" id="custom-model" placeholder="如：gpt-4o-mini">
+                </div>
+              </div>
+              <div style="margin-top: 10px; padding: 8px 12px; background: #fef3c7; border-radius: 6px; font-size: 11px; color: #92400e;">
+                💡 支持任何 OpenAI 兼容接口（如 Cohere、Azure、自部署模型等）
+              </div>
+              <div style="margin-top: 12px;">
+                <button class="btn btn-outline" onclick="testConnection('custom')">测试连接</button>
               </div>
             </div>
           </div>
@@ -931,12 +1160,39 @@
       switchDataSource(selectedSource);
     }
     
+    // 切换 AI 模型供应商
+    function switchAiProvider(provider) {
+      const cards  = ['siliconflow', 'openrouter', 'openai', 'custom'];
+      const prefix = 'card-';
+      const cfgPrefix = 'cfg-';
+
+      cards.forEach(p => {
+        const card = document.getElementById(prefix + p);
+        const cfg  = document.getElementById(cfgPrefix + p);
+        if (!card) return;
+
+        if (p === provider) {
+          card.classList.add('active');
+          if (cfg) { cfg.style.display = ''; cfg.classList.remove('disabled'); }
+        } else {
+          card.classList.remove('active');
+          if (cfg) { cfg.style.display = 'none'; cfg.classList.add('disabled'); }
+        }
+      });
+
+      // 同步状态点
+      cards.forEach(p => {
+        const dot = document.getElementById(p + '-status');
+        if (dot) dot.className = 'status-dot ' + (p === provider ? 'connected' : 'disconnected');
+      });
+    }
+
     // 切换数据源
     function switchDataSource(source) {
       const lingxingOption = document.getElementById('lingxing-option');
       const amazonOption = document.getElementById('amazon-option');
-      const lingxingConfig = document.getElementById('lingxing-config');
-      const amazonConfig = document.getElementById('amazon-config');
+      const lingxingPanel = document.getElementById('lingxing-panel');
+      const amazonPanel = document.getElementById('amazon-panel');
       const lingxingIndicator = document.getElementById('lingxing-indicator');
       const amazonIndicator = document.getElementById('amazon-indicator');
       const radioLingxing = document.getElementById('radio-lingxing');
@@ -949,9 +1205,9 @@
         amazonOption.classList.remove('active');
         amazonOption.classList.add('inactive');
         
-        // 配置块：领星启用，亚马逊禁用
-        lingxingConfig.classList.remove('disabled');
-        amazonConfig.classList.add('disabled');
+        // 面板切换：领星显示，亚马逊隐藏
+        lingxingPanel.classList.add('active');
+        amazonPanel.classList.remove('active');
         
         lingxingIndicator.classList.add('active');
         amazonIndicator.classList.remove('active');
@@ -966,9 +1222,9 @@
         lingxingOption.classList.remove('active');
         lingxingOption.classList.add('inactive');
         
-        // 配置块：亚马逊启用，领星禁用
-        amazonConfig.classList.remove('disabled');
-        lingxingConfig.classList.add('disabled');
+        // 面板切换：亚马逊显示，领星隐藏
+        amazonPanel.classList.add('active');
+        lingxingPanel.classList.remove('active');
         
         amazonIndicator.classList.add('active');
         lingxingIndicator.classList.remove('active');
@@ -1018,10 +1274,13 @@
           if (result.success && Object.keys(result.data).length > 0) {
             config = {
               dataSource: result.data.dataSource || 'lingxing',
+              aiProvider: result.data.aiProvider || 'siliconflow',
               lingxing: result.data.lingxing ? JSON.parse(result.data.lingxing) : {},
               amazon: result.data.amazon ? JSON.parse(result.data.amazon) : {},
               openai: result.data.openai ? JSON.parse(result.data.openai) : {},
               openrouter: result.data.openrouter ? JSON.parse(result.data.openrouter) : {},
+              siliconflow: result.data.siliconflow ? JSON.parse(result.data.siliconflow) : {},
+              custom: result.data.custom ? JSON.parse(result.data.custom) : {},
               stores: result.data.stores ? JSON.parse(result.data.stores) : { us: true },
               optimizer: result.data.optimizer ? JSON.parse(result.data.optimizer) : {}
             };
@@ -1041,6 +1300,16 @@
       if (config) {
         if (config.dataSource) {
           switchDataSource(config.dataSource);
+        }
+
+        // 恢复 AI Provider 选择
+        const aiProvider = config.aiProvider || 'siliconflow';
+        switchAiProvider(aiProvider);
+
+        if (config.custom) {
+          document.getElementById('custom-api-key').value = config.custom.apiKey || '';
+          document.getElementById('custom-model').value = config.custom.model || '';
+          document.getElementById('custom-base-url').value = config.custom.baseUrl || '';
         }
         
         if (config.lingxing) {
@@ -1066,10 +1335,23 @@
           document.getElementById('openrouter-model').value = config.openrouter.model || 'openai/gpt-4o';
         }
 
+        if (config.siliconflow) {
+          document.getElementById('siliconflow-api-key').value = config.siliconflow.apiKey || '';
+          if (config.siliconflow.model) {
+            document.getElementById('siliconflow-model').value = config.siliconflow.model;
+          }
+          if (config.siliconflow.apiKey) updateStatusDot('siliconflow-status', true);
+        }
+
         // 自动拉取模型列表并恢复上次选择的模型
         if (config?.openrouter?.apiKey) {
           pendingModelSelection = config.openrouter.model || '';
           setTimeout(() => refreshSysModelList(), 0);
+          // 立即用已保存的模型值填充下拉框（防止 API 失败时 fallback 模型覆盖）
+          const orModelSel = document.getElementById('openrouter-model');
+          if (orModelSel && pendingModelSelection) {
+            orModelSel.value = pendingModelSelection;
+          }
         }
 
         if (config.stores) {
@@ -1114,6 +1396,20 @@
             model: document.getElementById('openrouter-model').value
           };
           break;
+        case 'siliconflow':
+          config = {
+            apiKey: document.getElementById('siliconflow-api-key').value,
+            baseUrl: 'https://api.siliconflow.cn/v1',
+            model: document.getElementById('siliconflow-model').value
+          };
+          break;
+        case 'custom':
+          config = {
+            apiKey: document.getElementById('custom-api-key').value,
+            baseUrl: document.getElementById('custom-base-url').value || 'https://api.openai.com/v1',
+            model: document.getElementById('custom-model').value
+          };
+          break;
       }
       
       try {
@@ -1142,7 +1438,13 @@
           }).catch(e => {});
         } else {
           statusDot.className = 'status-dot disconnected';
-          showToast('连接失败: ' + (result.error || '未知错误'), 'error');
+          // 区分模型不可用（区域限制等）和一般连接失败
+          const isModelUnavailable = result.modelUnavailable;
+          const errorMsg = result.error || '未知错误';
+          const toastMsg = isModelUnavailable
+            ? '模型不可用: ' + errorMsg
+            : '连接失败: ' + errorMsg;
+          showToast(toastMsg, 'error');
           // 记录测试失败日志
           fetch('/api/logs', {
             method: 'POST',
@@ -1152,7 +1454,7 @@
               operation_type: '测试连接',
               target_name: type,
               reason: `测试${type} API连接失败，需检查配置参数`,
-              details: JSON.stringify({ success: false, type, error: result.error })
+              details: JSON.stringify({ success: false, type, error: errorMsg, modelUnavailable: isModelUnavailable })
             })
           }).catch(e => {});
         }
@@ -1170,15 +1472,22 @@
     async function saveSettings() {
       const dataSource = document.querySelector('input[name="dataSource"]:checked')?.value || 'lingxing';
 
+      // 从 UI 中获取当前选中的 AI Provider
+      const activeCard = document.querySelector('.ai-provider-card.active');
+      const aiProvider = activeCard ? activeCard.id.replace('card-', '') : 'siliconflow';
+
       const getVal = id => document.getElementById(id)?.value || '';
       const config = {
         dataSource: dataSource,
-        lingxing:   { apiKey: getVal('lingxing-api-key'), apiSecret: getVal('lingxing-api-secret'), baseUrl: getVal('lingxing-base-url') || 'https://api.lingxing.com' },
-        amazon:     { clientId: getVal('amazon-client-id'), clientSecret: getVal('amazon-client-secret'), refreshToken: getVal('amazon-refresh-token') },
+        aiProvider: aiProvider,
+        lingxing:    { apiKey: getVal('lingxing-api-key'), apiSecret: getVal('lingxing-api-secret'), baseUrl: getVal('lingxing-base-url') || 'https://api.lingxing.com' },
+        amazon:      { clientId: getVal('amazon-client-id'), clientSecret: getVal('amazon-client-secret'), refreshToken: getVal('amazon-refresh-token') },
         openai:      { apiKey: getVal('openai-api-key'), model: getVal('openai-model') || 'gpt-4o' },
-        openrouter: { apiKey: getVal('openrouter-api-key'), baseUrl: getVal('openrouter-base-url') || 'https://openrouter.ai/api/v1', model: getVal('openrouter-model') },
-        stores:     { us: document.getElementById('store-us')?.checked ?? true, uk: document.getElementById('store-uk')?.checked ?? false, de: document.getElementById('store-de')?.checked ?? false, jp: document.getElementById('store-jp')?.checked ?? false },
-        optimizer:  { autoBidding: true, autoNegative: true, defaultAcos: parseFloat(getVal('defaultAcos')) || 25 }
+        openrouter:  { apiKey: getVal('openrouter-api-key'), baseUrl: getVal('openrouter-base-url') || 'https://openrouter.ai/api/v1', model: getVal('openrouter-model') },
+        siliconflow: { apiKey: getVal('siliconflow-api-key'), model: getVal('siliconflow-model') || 'Qwen/Qwen3-8B' },
+        custom:      { apiKey: getVal('custom-api-key'), model: getVal('custom-model'), baseUrl: getVal('custom-base-url') },
+        stores:      { us: document.getElementById('store-us')?.checked ?? true, uk: document.getElementById('store-uk')?.checked ?? false, de: document.getElementById('store-de')?.checked ?? false, jp: document.getElementById('store-jp')?.checked ?? false },
+        optimizer:   { autoBidding: true, autoNegative: true, defaultAcos: parseFloat(getVal('defaultAcos')) || 25 }
       };
 
       localStorage.setItem('apiConfig', JSON.stringify(config));
@@ -1186,10 +1495,13 @@
       try {
         const configsToSave = [
           { key: 'dataSource', value: dataSource },
+          { key: 'aiProvider', value: aiProvider },
           { key: 'lingxing', value: JSON.stringify(config.lingxing) },
           { key: 'amazon', value: JSON.stringify(config.amazon) },
           { key: 'openai', value: JSON.stringify(config.openai) },
           { key: 'openrouter', value: JSON.stringify(config.openrouter) },
+          { key: 'siliconflow', value: JSON.stringify(config.siliconflow) },
+          { key: 'custom', value: JSON.stringify(config.custom) },
           { key: 'stores', value: JSON.stringify(config.stores) },
           { key: 'optimizer', value: JSON.stringify(config.optimizer) }
         ];
@@ -1229,6 +1541,7 @@
       if (config.amazon.clientId) updateStatusDot('amazon-status', true);
       if (config.openai.apiKey) updateStatusDot('openai-status', true);
       if (config.openrouter.apiKey) updateStatusDot('openrouter-status', true);
+      if (config.siliconflow.apiKey) updateStatusDot('siliconflow-status', true);
     }
     
     function showToast(message, type = 'success') {
@@ -1357,7 +1670,12 @@
       } catch (e) {
         if (status) { status.textContent = '❌ ' + e.message; status.style.color = '#ef4444'; }
         if (sel) {
-          sel.innerHTML = '<option value="openai/gpt-4o">GPT-4o</option><option value="meta-llama/llama-4-maverick">Llama 4 Maverick（免费）</option>';
+          // API 失败时：基础 fallback + 把已保存的模型也加进去（防止丢失）
+          let fallback = '<option value="openai/gpt-4o">GPT-4o</option><option value="meta-llama/llama-4-maverick">Llama 4 Maverick（免费）</option>';
+          if (pendingModelSelection && !['openai/gpt-4o','meta-llama/llama-4-maverick'].includes(pendingModelSelection)) {
+            fallback += `<option value="${pendingModelSelection}">${pendingModelSelection}</option>`;
+          }
+          sel.innerHTML = fallback;
           sel.disabled = false;
           // 尝试恢复上次选择的模型（即使加载失败）
           if (pendingModelSelection) {
@@ -1368,6 +1686,97 @@
         }
       } finally {
         if (btn) btn.disabled = false;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // SiliconFlow：动态拉取模型列表
+    // ─────────────────────────────────────────────────────────
+    async function refreshSFModelList() {
+      const apiKey = document.getElementById('siliconflow-api-key').value.trim();
+      const sel    = document.getElementById('siliconflow-model');
+      const status = document.getElementById('sf-model-status');
+
+      if (!apiKey) {
+        if (status) { status.textContent = '⚠️ 请先填写 SiliconFlow API Key'; status.style.color = '#ef4444'; }
+        return;
+      }
+
+      if (status) { status.textContent = '⏳ 正在拉取模型列表...'; status.style.color = '#6b7280'; }
+
+      try {
+        const res  = await fetch(`/api/agent/siliconflow-models?apiKey=${encodeURIComponent(apiKey)}`);
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || '拉取失败');
+
+        const models = json.data || [];
+        if (sel && models.length > 0) {
+          const currentVal = sel.value;
+          sel.innerHTML = '';
+          // 精选常用模型置顶
+          const featured = ['Qwen/Qwen3-8B','Qwen/Qwen3-30B-A3B','Qwen/Qwen3-235B-A22B','deepseek-ai/DeepSeek-V3','deepseek-ai/DeepSeek-R1','THUDM/glm-4-9b-chat'];
+          const featuredGroup = document.createElement('optgroup');
+          featuredGroup.label = '── 精选推荐 ──';
+          featured.forEach(id => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = id;
+            featuredGroup.appendChild(opt);
+          });
+          sel.appendChild(featuredGroup);
+
+          // 其余模型
+          const otherGroup = document.createElement('optgroup');
+          otherGroup.label = '── 全部模型 ──';
+          models.forEach(m => {
+            if (featured.includes(m.id)) return;
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.id;
+            otherGroup.appendChild(opt);
+          });
+          if (otherGroup.children.length > 0) sel.appendChild(otherGroup);
+
+          // 恢复之前的选择
+          if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+            sel.value = currentVal;
+          }
+        }
+
+        if (status) { status.textContent = '✅ 已加载 ' + models.length + ' 个模型'; status.style.color = '#16a34a'; }
+      } catch (e) {
+        if (status) { status.textContent = '❌ ' + e.message; status.style.color = '#ef4444'; }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // SiliconFlow：保存并激活（直接写入数据库，重启不丢）
+    // ─────────────────────────────────────────────────────────
+    async function saveAndActivateSF() {
+      const apiKey = document.getElementById('siliconflow-api-key').value.trim();
+      const model  = document.getElementById('siliconflow-model').value;
+
+      if (!apiKey) { showToast('请先填写 SiliconFlow API Key', 'error'); return; }
+
+      try {
+        // 同时保存 SiliconFlow 配置和 aiProvider
+        await Promise.all([
+          fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'aiProvider', value: 'siliconflow' })
+          }),
+          fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'siliconflow', value: JSON.stringify({ apiKey, model }) })
+          })
+        ]);
+        switchAiProvider('siliconflow');
+        updateStatusDot('siliconflow-status', true);
+        showToast(`✅ SiliconFlow 已保存并启用！模型：${model}`, 'success');
+      } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
       }
     }
   </script>

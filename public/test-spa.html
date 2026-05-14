@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>SPA Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #log { background: #f5f5f5; padding: 10px; margin-top: 20px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>SPA Test</h1>
+  <button onclick="testLoad('index')">Load Index</button>
+  <button onclick="testLoad('analysis-report')">Load Analysis Report</button>
+  <div id="log"></div>
+  
+  <script>
+    function log(msg) {
+      document.getElementById('log').textContent += msg + '\n';
+    }
+    
+    async function testLoad(page) {
+      log('=== Testing ' + page + ' ===');
+      try {
+        const file = page + '.html';
+        log('Fetching: ' + file);
+        const res = await fetch(file);
+        log('Response status: ' + res.status);
+        const html = await res.text();
+        log('HTML length: ' + html.length);
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        log('Document parsed');
+        
+        const main = doc.querySelector('main.main') || doc.querySelector('.main') || doc.querySelector('main');
+        log('Main found: ' + !!main);
+        if (main) {
+          log('Main content length: ' + main.innerHTML.length);
+          log('Main tagName: ' + main.tagName);
+          log('Main className: ' + main.className);
+        }
+      } catch (e) {
+        log('Error: ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
