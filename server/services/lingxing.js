@@ -1,34 +1,27 @@
 /**
  * 领星ERP API 服务
- * 文档: https://open.lingxing.com/docs/
+ * 文档: https://apidoc.lingxing.com (需 access_key 访问)
+ * 
+ * 认证流程:
+ * 1. POST /api/auth-server/oauth/access-token (form-data: appId + appSecret)
+ *    → 获取 access_token
+ * 2. 业务请求 URL 拼接公共参数: access_token + app_key + timestamp + sign
+ * 3. sign 签名规则:
+ *    a) 参数按 ASCII 排序
+ *    b) 拼成 key1=value1&key2=value2... 格式
+ *    c) MD5(32位) 后转大写
+ *    d) AES/ECB/PKCS5Padding 加密，密钥 = appId
  */
 
 const axios = require('axios');
+const crypto = require('crypto');
 
 // Mock数据
 const MOCK_DATA = {
   stores: [
-    {
-      store_id: 'store_001',
-      store_name: '美国站',
-      marketplace: 'Amazon.com',
-      region: 'NA',
-      status: 'active'
-    },
-    {
-      store_id: 'store_002',
-      store_name: '英国站',
-      marketplace: 'Amazon.co.uk',
-      region: 'EU',
-      status: 'active'
-    },
-    {
-      store_id: 'store_003',
-      store_name: '德国站',
-      marketplace: 'Amazon.de',
-      region: 'EU',
-      status: 'active'
-    }
+    { store_id: 'store_001', store_name: '美国站', marketplace: 'Amazon.com', region: 'NA', status: 'active' },
+    { store_id: 'store_002', store_name: '英国站', marketplace: 'Amazon.co.uk', region: 'EU', status: 'active' },
+    { store_id: 'store_003', store_name: '德国站', marketplace: 'Amazon.de', region: 'EU', status: 'active' }
   ],
   products: [
     { sku_id: 'SKU001', sku: 'Wireless-Headphones-BK', asin: 'B08XXXXX1', name: '无线蓝牙耳机 黑色', img: 'https://placehold.co/80x80/333/fff?text=耳机', status: 'active', store_id: 'store_001' },
@@ -48,23 +41,17 @@ const MOCK_DATA = {
     const data = [];
     const campaigns = ['camp_001', 'camp_002', 'camp_003', 'camp_004', 'camp_005'];
     const startDate = new Date('2026-04-23');
-    
     for (let i = 0; i < 30; i++) {
       const date = new Date(startDate);
       date.setDate(date.getDate() + i);
       const dateStr = date.toISOString().split('T')[0];
-      
       campaigns.forEach(campaign_id => {
         const impressions = Math.floor(Math.random() * 5000) + 1000;
         const clicks = Math.floor(impressions * (Math.random() * 0.1 + 0.02));
         const cost = clicks * (Math.random() * 1.5 + 0.5);
         const sales = Math.floor(cost * (Math.random() * 5 + 1));
-        
         data.push({
-          date: dateStr,
-          campaign_id,
-          impressions,
-          clicks,
+          date: dateStr, campaign_id, impressions, clicks,
           cost: Math.round(cost * 100) / 100,
           sales: Math.round(sales * 100) / 100,
           orders: Math.floor(sales / 30),
@@ -81,16 +68,69 @@ const MOCK_DATA = {
 
 class LingxingService {
   constructor() {
-    this.apiKey = process.env.LINGXING_API_KEY;
-    this.apiSecret = process.env.LINGXING_API_SECRET;
-    this.baseUrl = process.env.LINGXING_API_URL || 'https://openapi.lingxing.com/api';
+    this.appId = process.env.LINGXING_API_KEY;
+    this.appSecret = process.env.LINGXING_API_SECRET;
+    this.baseUrl = process.env.LINGXING_API_URL || 'https://openapi.lingxing.com';
     this.accessToken = null;
     this.tokenExpiry = null;
+    this.refreshToken = null;
     this.mockMode = process.env.MOCK_MODE === 'true';
   }
 
   /**
-   * 获取访问令牌
+   * 生成签名 sign
+   * 规则:
+   * 1. 参数按 ASCII 排序（access_token, app_key, timestamp）
+   * 2. 拼成 key1=value1&key2=value2... 格式
+   * 3. MD5(32位) 后转大写
+   * 4. AES/ECB/PKCS5Padding 加密，密钥 = appId
+   */
+  generateSign(params) {
+    // 1. 按 ASCII 排序参数
+    const sortedKeys = Object.keys(params).sort();
+    
+    // 2. 拼成 key=value&key=value... 格式（value为空不参与，null参与）
+    const paramPairs = sortedKeys
+      .filter(key => params[key] !== undefined && params[key] !== '')
+      .map(key => `${key}=${params[key]}`);
+    
+    const paramString = paramPairs.join('&');
+    console.log('签名原文:', paramString);
+    
+    // 3. MD5(32位) 后转大写
+    const md5Hash = crypto.createHash('md5').update(paramString).digest('hex').toUpperCase();
+    console.log('MD5结果:', md5Hash);
+    
+    // 4. AES/ECB/PKCS5Padding 加密，密钥 = appId
+    // 注意：AES密钥需要是16/24/32字节，如果appId不够长需要处理
+    const key = this.padKey(this.appId);
+    const cipher = crypto.createCipheriv('aes-128-ecb', key, Buffer.alloc(0));
+    cipher.setAutoPadding(true);
+    let encrypted = cipher.update(md5Hash, 'utf8', 'base64');
+    encrypted += cipher.final('base64');
+    
+    console.log('AES加密结果:', encrypted);
+    return encrypted;
+  }
+
+  /**
+   * 补齐 AES 密钥到 16 字节
+   */
+  padKey(key) {
+    const keyBuffer = Buffer.from(key, 'utf8');
+    if (keyBuffer.length >= 16) {
+      return keyBuffer.slice(0, 16);
+    }
+    // PKCS7 padding
+    const padLen = 16 - keyBuffer.length;
+    const padding = Buffer.alloc(padLen, padLen);
+    return Buffer.concat([keyBuffer, padding]);
+  }
+
+  /**
+   * 获取访问令牌 (OAuth)
+   * POST /api/auth-server/oauth/access-token
+   * form-data: appId + appSecret
    */
   async getAccessToken() {
     if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
@@ -98,61 +138,133 @@ class LingxingService {
     }
 
     try {
-      console.log('正在请求领星API:', `${this.baseUrl}/auth/token`);
-      console.log('API Key:', this.apiKey);
+      const url = `${this.baseUrl}/api/auth-server/oauth/access-token`;
+      console.log('正在请求领星Token:', url);
+      console.log('AppId:', this.appId);
       
-      const response = await axios.post(`${this.baseUrl}/auth/token`, {
-        api_key: this.apiKey,
-        api_secret: this.apiSecret
+      const formData = new URLSearchParams();
+      formData.append('appId', this.appId);
+      formData.append('appSecret', this.appSecret);
+      
+      const response = await axios.post(url, formData.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
 
-      console.log('API响应:', JSON.stringify(response.data));
+      console.log('Token响应:', JSON.stringify(response.data));
 
-      if (response.data.code === 0) {
+      if (response.data.code === '200' || response.data.code === 200) {
         this.accessToken = response.data.data.access_token;
+        this.refreshToken = response.data.data.refresh_token;
+        // expires_in 单位是秒，提前5分钟过期
         this.tokenExpiry = Date.now() + (response.data.data.expires_in - 300) * 1000;
+        console.log('Token获取成功，过期时间:', new Date(this.tokenExpiry).toLocaleString());
         return this.accessToken;
       } else {
-        throw new Error(response.data.message || `获取令牌失败: ${response.data.code}`);
+        throw new Error(response.data.msg || `获取令牌失败: ${response.data.code}`);
       }
     } catch (error) {
       if (error.response) {
-        console.error('领星API错误响应:', error.response.status, error.response.data);
-        throw new Error(`API错误 ${error.response.status}: ${JSON.stringify(error.response.data)}`);
+        console.error('领星Token错误响应:', error.response.status, error.response.data);
+        throw new Error(`Token错误 ${error.response.status}: ${JSON.stringify(error.response.data)}`);
       }
-      console.error('领星API认证失败:', error.message);
+      console.error('领星Token认证失败:', error.message);
       throw error;
     }
   }
 
   /**
-   * 通用API请求
+   * 刷新访问令牌
+   * POST /api/auth-server/oauth/refresh
    */
-  async request(method, endpoint, params = {}, data = null) {
+  async refreshAccessToken() {
+    try {
+      const url = `${this.baseUrl}/api/auth-server/oauth/refresh`;
+      console.log('正在刷新领星Token:', url);
+      
+      const formData = new URLSearchParams();
+      formData.append('appId', this.appId);
+      formData.append('refreshToken', this.refreshToken);
+      
+      const response = await axios.post(url, formData.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+
+      if (response.data.code === '200' || response.data.code === 200) {
+        this.accessToken = response.data.data.access_token;
+        this.refreshToken = response.data.data.refresh_token;
+        this.tokenExpiry = Date.now() + (response.data.data.expires_in - 300) * 1000;
+        return this.accessToken;
+      } else {
+        throw new Error(response.data.msg || `刷新令牌失败: ${response.data.code}`);
+      }
+    } catch (error) {
+      console.error('刷新Token失败:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 生成带签名的公共请求参数
+   */
+  async buildCommonParams() {
     const token = await this.getAccessToken();
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    
+    const params = {
+      access_token: token,
+      app_key: this.appId,
+      timestamp: timestamp
+    };
+    
+    // 生成签名
+    params.sign = this.generateSign(params);
+    
+    return params;
+  }
+
+  /**
+   * 通用API请求
+   * GET: 业务参数 + 公共参数 都拼在 URL 上
+   * POST: 公共参数拼在 URL 上，业务参数放 Body (JSON)
+   */
+  async request(method, endpoint, bizParams = {}, bizData = null) {
+    const commonParams = await this.buildCommonParams();
+    
+    // 合并公共参数和业务参数
+    const allParams = { ...commonParams, ...bizParams };
+    
+    // 构建 URL
+    const queryString = Object.entries(allParams)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
+    
+    const url = `${this.baseUrl}${endpoint}?${queryString}`;
     
     const config = {
       method,
-      url: `${this.baseUrl}${endpoint}`,
+      url,
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      },
-      params: method === 'GET' ? params : undefined,
-      data: method !== 'GET' ? data : undefined
+      }
     };
+    
+    // POST 请求：业务参数放 Body
+    if (method === 'POST' && bizData) {
+      config.data = bizData;
+    }
 
     try {
+      console.log(`[${method}] ${endpoint}`);
       const response = await axios(config);
       
-      if (response.data.code === 0) {
+      if (response.data.code === '200' || response.data.code === 200) {
         return response.data.data;
       } else {
-        throw new Error(response.data.message || `API错误: ${response.data.code}`);
+        throw new Error(response.data.msg || `API错误: ${response.data.code}`);
       }
     } catch (error) {
       if (error.response) {
-        throw new Error(`API请求失败: ${error.response.status} - ${error.response.data?.message || error.message}`);
+        throw new Error(`API请求失败: ${error.response.status} - ${error.response.data?.msg || error.message}`);
       }
       throw error;
     }
@@ -181,9 +293,9 @@ class LingxingService {
       console.log('[Mock] 返回店铺列表');
       return MOCK_DATA.stores;
     }
-    return await this.request('GET', '/store/list', {
+    return await this.request('GET', '/erp/sc/data/local_inventory/brand', {
       page: 1,
-      page_size: 100
+      length: 100
     });
   }
 
@@ -224,7 +336,6 @@ class LingxingService {
         data = data.filter(d => d.date <= params.endDate);
       }
       
-      // 聚合数据
       const summary = data.reduce((acc, item) => {
         acc.impressions += item.impressions;
         acc.clicks += item.clicks;
@@ -241,7 +352,7 @@ class LingxingService {
       
       return { data, summary };
     }
-    return await this.request('POST', '/report/ad', {
+    return await this.request('POST', '/report/ad', {}, {
       store_id: params.storeId,
       campaign_id: params.campaignId,
       ad_group_id: params.adGroupId,
@@ -266,7 +377,6 @@ class LingxingService {
         data = data.filter(d => d.date <= params.endDate);
       }
       
-      // 按campaign_id聚合
       const byCampaign = {};
       data.forEach(item => {
         if (!byCampaign[item.campaign_id]) {
@@ -286,7 +396,7 @@ class LingxingService {
         roas: metrics.cost > 0 ? (metrics.sales / metrics.cost).toFixed(2) : 0
       }));
     }
-    return await this.request('POST', '/report/portfolio', {
+    return await this.request('POST', '/report/portfolio', {}, {
       store_id: params.storeId,
       portfolio_id: params.portfolioId,
       start_date: params.startDate,
@@ -329,7 +439,7 @@ class LingxingService {
         message: 'Mock模式: 数据同步完成（模拟数据）'
       };
     }
-    return await this.request('POST', '/sync/ad', {
+    return await this.request('POST', '/sync/ad', {}, {
       store_id: params.storeId,
       start_date: params.startDate,
       end_date: params.endDate
