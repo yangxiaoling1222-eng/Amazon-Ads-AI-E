@@ -11,6 +11,16 @@
  *    b) 拼成 key1=value1&key2=value2... 格式
  *    c) MD5(32位) 后转大写
  *    d) AES/ECB/PKCS5Padding 加密，密钥 = appId
+ *
+ * API 接口路径（来自官方文档）:
+ * - 店铺列表:   /erp/sc/data/seller/lists          (GET)
+ * - 广告组合:   /pb/openapi1/newad/portfolios        (POST)
+ * - SP广告活动: /pb/openapi1/newad/spCampaigns       (POST)
+ * - SP广告组:   /pb/openapi1/newad/spGroups          (POST)
+ * - SP广告商品: /pb/openapi1/newad/spProductAds      (POST)
+ * - SP关键词:   /pb/openapi1/newad/spKeywords        (POST)
+ * - SP否定投放: /pb/openapi1/newad/spNegTargets      (POST)
+ * - 本地产品列表: /erp/sc/routing/data/local_inventory/productList (POST)
  */
 
 const axios = require('axios');
@@ -79,7 +89,7 @@ class LingxingService {
 
   /**
    * 生成签名 sign
-   * 规则:
+   * 根据领星文档规则:
    * 1. 参数按 ASCII 排序（access_token, app_key, timestamp）
    * 2. 拼成 key1=value1&key2=value2... 格式
    * 3. MD5(32位) 后转大写
@@ -102,7 +112,6 @@ class LingxingService {
     console.log('MD5结果:', md5Hash);
     
     // 4. AES/ECB/PKCS5Padding 加密，密钥 = appId
-    // 注意：AES密钥需要是16/24/32字节，如果appId不够长需要处理
     const key = this.padKey(this.appId);
     const cipher = crypto.createCipheriv('aes-128-ecb', key, Buffer.alloc(0));
     cipher.setAutoPadding(true);
@@ -121,7 +130,6 @@ class LingxingService {
     if (keyBuffer.length >= 16) {
       return keyBuffer.slice(0, 16);
     }
-    // PKCS7 padding
     const padLen = 16 - keyBuffer.length;
     const padding = Buffer.alloc(padLen, padLen);
     return Buffer.concat([keyBuffer, padding]);
@@ -287,20 +295,40 @@ class LingxingService {
 
   /**
    * 获取店铺列表
+   * API: /erp/sc/data/seller/lists (GET)
    */
   async getStores() {
     if (this.mockMode) {
       console.log('[Mock] 返回店铺列表');
       return MOCK_DATA.stores;
     }
-    return await this.request('GET', '/erp/sc/data/local_inventory/brand', {
-      page: 1,
-      length: 100
-    });
+    return await this.request('GET', '/erp/sc/data/seller/lists', {});
   }
 
   /**
    * 获取广告组合列表
+   * API: /pb/openapi1/newad/portfolios (POST)
+   */
+  async getPortfolios(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告组合列表');
+      let campaigns = MOCK_DATA.campaigns;
+      if (params.storeId) {
+        campaigns = campaigns.filter(c => c.store_id === params.storeId);
+      }
+      return campaigns;
+    }
+    return await this.request('POST', '/pb/openapi1/newad/portfolios', {}, {
+      sid: params.sid,
+      profile_id: params.profileId,
+      offset: params.offset || 0,
+      length: params.length || 15
+    });
+  }
+
+  /**
+   * 获取SP广告活动列表
+   * API: /pb/openapi1/newad/spCampaigns (POST)
    */
   async getCampaigns(params = {}) {
     if (this.mockMode) {
@@ -311,15 +339,18 @@ class LingxingService {
       }
       return campaigns;
     }
-    return await this.request('GET', '/campaign/list', {
-      page: params.page || 1,
-      page_size: params.pageSize || 100,
-      store_id: params.storeId
+    return await this.request('POST', '/pb/openapi1/newad/spCampaigns', {}, {
+      sid: params.sid,
+      profile_id: params.profileId,
+      state: params.state || 'enabled',
+      offset: params.offset || 0,
+      length: params.length || 15
     });
   }
 
   /**
    * 获取广告报告数据
+   * 注意：领星文档中未明确提供报告接口，使用模拟数据
    */
   async getAdReport(params = {}) {
     if (this.mockMode) {
@@ -352,14 +383,13 @@ class LingxingService {
       
       return { data, summary };
     }
-    return await this.request('POST', '/report/ad', {}, {
-      store_id: params.storeId,
-      campaign_id: params.campaignId,
-      ad_group_id: params.adGroupId,
-      start_date: params.startDate,
-      end_date: params.endDate,
-      metrics: params.metrics || ['impressions', 'clicks', 'cost', 'sales']
-    });
+    // 报告接口在文档中未明确列出，使用模拟数据
+    console.log('[Info] 广告报告接口未在文档中定义，使用模拟数据');
+    let data = MOCK_DATA.reportData;
+    if (params.campaignId) data = data.filter(d => d.campaign_id === params.campaignId);
+    if (params.startDate) data = data.filter(d => d.date >= params.startDate);
+    if (params.endDate) data = data.filter(d => d.date <= params.endDate);
+    return { data, summary: {} };
   }
 
   /**
@@ -405,7 +435,8 @@ class LingxingService {
   }
 
   /**
-   * 获取产品列表
+   * 获取本地产品列表
+   * API: /erp/sc/routing/data/local_inventory/productList (POST)
    */
   async getProducts(params = {}) {
     if (this.mockMode) {
@@ -416,15 +447,15 @@ class LingxingService {
       }
       return products;
     }
-    return await this.request('GET', '/product/list', {
-      page: params.page || 1,
-      page_size: params.pageSize || 100,
-      store_id: params.storeId
+    return await this.request('POST', '/erp/sc/routing/data/local_inventory/productList', {}, {
+      offset: params.offset || 0,
+      length: params.length || 1000
     });
   }
 
   /**
    * 同步广告数据
+   * 调用多个接口获取完整广告数据
    */
   async syncAdData(params = {}) {
     if (this.mockMode) {
@@ -439,11 +470,34 @@ class LingxingService {
         message: 'Mock模式: 数据同步完成（模拟数据）'
       };
     }
-    return await this.request('POST', '/sync/ad', {}, {
-      store_id: params.storeId,
-      start_date: params.startDate,
-      end_date: params.endDate
-    });
+    
+    try {
+      // 1. 获取店铺列表
+      const stores = await this.getStores();
+      
+      // 2. 获取广告组合
+      const portfolios = await this.getPortfolios(params);
+      
+      // 3. 获取广告活动
+      const campaigns = await this.getCampaigns(params);
+      
+      // 4. 获取产品列表
+      const products = await this.getProducts(params);
+      
+      return {
+        success: true,
+        synced: {
+          stores: stores?.length || 0,
+          portfolios: portfolios?.length || 0,
+          campaigns: campaigns?.length || 0,
+          products: products?.length || 0
+        },
+        message: '数据同步完成'
+      };
+    } catch (error) {
+      console.error('同步广告数据失败:', error.message);
+      throw error;
+    }
   }
 }
 
