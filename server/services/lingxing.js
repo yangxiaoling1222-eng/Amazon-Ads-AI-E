@@ -272,13 +272,18 @@ class LingxingService {
       console.log(`[${method}] ${endpoint}`);
       const response = await axios(config);
       
+      // 打印完整响应，方便调试
+      console.log(`[响应] ${endpoint}:`, JSON.stringify(response.data).substring(0, 500));
+      
       if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
         return response.data.data;
       } else {
         throw new Error(response.data.msg || `API错误: ${response.data.code}`);
       }
     } catch (error) {
+      console.error(`[错误] ${endpoint}:`, error.message);
       if (error.response) {
+        console.error(`[HTTP错误] ${error.response.status}:`, JSON.stringify(error.response.data).substring(0, 500));
         throw new Error(`API请求失败: ${error.response.status} - ${error.response.data?.msg || error.message}`);
       }
       throw error;
