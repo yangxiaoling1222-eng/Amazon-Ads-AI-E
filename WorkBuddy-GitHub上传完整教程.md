@@ -1,404 +1,292 @@
 # WorkBuddy GitHub 上传完整教程
 
-> 本教程基于 2026-05-11 成功上传路径，针对您项目中容易出错的地方做了特别提醒。
+> 本教程覆盖 Git 安装 → 配置 → 上传 → 常见问题解决的全过程。
 
 ---
 
-## 目录
+## 一、安装 Git（3种方法）
 
-1. [环境准备](#1-环境准备)
-2. [首次上传（新建仓库）](#2-首次上传新建仓库)
-3. [后续更新代码](#3-后续更新代码)
-4. [常见问题与解决](#4-常见问题与解决)
+### 方法 A：使用批处理脚本（最简单）✅
+
+1. 双击运行项目目录中的 `安装Git并上传到GitHub.bat`
+2. 等待 Git 下载并安装
+3. **安装完成后必须重启电脑**
+4. 重启后再次运行 `安装Git并上传到GitHub.bat`
+5. 按提示操作即可完成上传
+
+### 方法 B：手动下载安装（推荐）✅
+
+1. 访问：https://git-scm.com/download/win
+2. 点击 **"64-bit Git for Windows Setup"** 下载
+3. 运行安装包，**关键步骤**：
+   - **Select Components**：全部保持默认
+   - **Adjusting your PATH environment**：⚠️ 必须选择 **"Git from the command line and also from 3rd-party software"**
+   - 其他全部保持默认，一路 Next
+4. 安装完成后，**关闭所有 PowerShell/CMD 窗口**，再重新打开
+
+### 方法 C：使用 winget（Windows 10/11）✅
+
+以管理员身份打开 PowerShell，执行：
+```powershell
+winget install --id Git.Git -e --source winget --accept-package-agreements
+```
+安装后重启 PowerShell。
 
 ---
 
-## 1. 环境准备
+## 二、验证 Git 安装成功
 
-### 1.1 确认已安装 Git
-
-打开 **Git Bash**（不是 PowerShell），输入：
-
-```bash
+重新打开 PowerShell，执行：
+```powershell
 git --version
 ```
-
-**成功标志**：显示 `git version 2.x.x.windows.x`
+如果显示 `git version 2.x.x`，说明安装成功！
 
 ---
 
-### 1.2 确认项目目录
+## 三、配置 Git 用户信息
 
-在 Git Bash 中，进入项目目录：
-
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
-pwd
+在 PowerShell 中执行（**替换成您的信息**）：
+```powershell
+git config --global user.name "yangxiaoling1222-eng"
+git config --global user.email "您的GitHub邮箱"
+git config --global init.defaultBranch main
 ```
 
-**成功标志**：显示 `/c/Users/93178/WorkBuddy/20260429095857`
-
----
-
-### 1.3 确认 SSH Key 已配置（只需做一次）
-
-检查是否已有 SSH Key：
-
-```bash
-cat ~/.ssh/id_ed25519.pub
+验证配置：
+```powershell
+git config --global --list
 ```
 
-**如果有输出**（以 `ssh-ed25519` 开头）→ 跳过 1.4，直接进入第 2 步
-
-**如果没有输出**（报错 `No such file or directory`）→ 执行 1.4
-
 ---
 
-### 1.4 生成 SSH Key（只需做一次）
+## 四、清理敏感信息（上传前必做！）
 
-⚠️ **关键点**：每个命令单独输入，不要合并成一行！
-
-**第1步：生成密钥**
-```bash
-ssh-keygen -t ed25519 -C "yangxiaoling1222-eng@github"
+### ⚠️ 检查是否有 .env 文件
+```powershell
+# 查看项目根目录是否有 .env 文件
+dir .env
 ```
-按回车3次（确认路径 → 空密码 → 确认空密码）
+- ✅ 如果有：确认 `.gitignore` 中已包含 `.env`
+- ❌ 如果不在 .gitignore 中：立即添加，不要提交 `.env` 文件
 
-**第2步：查看公钥**
-```bash
-cat ~/.ssh/id_ed25519.pub
+### ⚠️ 搜索代码中的硬编码密钥
+```powershell
+# 搜索可能包含密钥的文件
+Select-String -Path "server\**\*.js" -Pattern "apiKey|secret|password|token" -CaseSensitive:$false
 ```
 
-复制输出的公钥（以 `ssh-ed25519` 开头），然后：
+如果代码中有硬编码的密钥，改为从环境变量读取：
 
-1. 打开：https://github.com/settings/keys
-2. 点击 **New SSH key**
-3. **Title**：`WorkBuddy`
-4. **Key**：粘贴公钥
-5. 点击 **Add SSH key**
+**修改前（不要这样）：**
+```javascript
+const apiKey = "abc123def456";  // ❌ 硬编码
+```
 
----
-
-## 2. 首次上传（新建仓库）
-
-> 假设您的 GitHub 仓库地址是：
-> `https://github.com/yangxiaoling1222-eng/Amazon-Ads-AI-E.git`
-
-⚠️ **本项目的敏感文件保护**：
-- `.env` 文件不会被上传（已在 `.gitignore` 中）
-- 数据库文件不会被上传
-- `.workbuddy` 目录不会被上传
+**修改后（正确做法）：**
+```javascript
+const apiKey = process.env.API_KEY;  // ✅ 从环境变量读取
+```
 
 ---
+
+## 五、上传代码到 GitHub
 
 ### 步骤 1：进入项目目录
-
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
+```powershell
+cd "c:\Users\93178\WorkBuddy\20260429095857"
 ```
 
----
-
-### 步骤 2：初始化 Git 仓库（只需做一次）
-
-```bash
+### 步骤 2：初始化 Git 仓库
+```powershell
 git init
 ```
 
----
-
-### 步骤 3：配置用户信息（只需做一次）
-
-⚠️ **重要**：必须先进入项目目录后再执行，否则可能提交到错误的位置。
-
-```bash
-git config user.name "yangxiaoling1222-eng"
-git config user.email "[email address removed]"
-```
-
----
-
-### 步骤 4：添加所有文件到暂存区
-
-```bash
+### 步骤 3：添加所有文件
+```powershell
 git add .
 ```
 
----
-
-### 步骤 5：检查要提交的文件（重要！）
-
-```bash
+### 步骤 4：检查哪些文件会被提交（重要！）
+```powershell
 git status
 ```
 
-**检查要点**：
-- ✅ 应该看到绿色的 `new file:` 列出一堆文件
-- ❌ **不应该**看到 `.env`、`*.db`、`node_modules/` 等敏感文件
-- 如果看到敏感文件，按 `Ctrl + C` 取消，然后检查 `.gitignore` 配置
+**确认没有以下文件：**
+- ❌ `.env`
+- ❌ `node_modules/`
+- ❌ `*.db` 或 `*.sqlite`
+- ❌ 包含真实 API 密钥的文件
 
----
-
-### 步骤 6：提交代码
-
-```bash
+### 步骤 5：提交代码
+```powershell
 git commit -m "初始提交：WorkBuddy 亚马逊广告 AI 优化平台"
 ```
 
----
-
-### 步骤 7：关联 GitHub 仓库（只需做一次）
-
-```bash
-git remote remove origin 2>/dev/null
-git remote add origin git@github.com:yangxiaoling1222-eng/Amazon-Ads-AI-E.git
+### 步骤 6：关联 GitHub 仓库
+```powershell
+git remote add origin https://github.com/yangxiaoling1222-eng/Amazon-Ads-AI-E.git
 ```
 
-⚠️ **必须使用 SSH 地址**，不要用 HTTPS！
-
----
-
-### 步骤 8：推送到 GitHub
-
-```bash
+### 步骤 7：推送到 GitHub
+```powershell
 git branch -M main
 git push -u origin main
 ```
 
 ---
 
-### 步骤 9：确认 SSH 连接
+## 六、输入 GitHub 凭证
 
-⚠️ **关键点**：第一次推送时会询问：
+推送时会弹出登录框或要求输入用户名和密码：
 
-```
-Are you sure you want to continue connecting (yes/no/[fingerprint])?
-```
+### 如果使用浏览器登录（推荐）
+1. 会自动打开浏览器
+2. 登录 GitHub 账号
+3. 点击 **"Authorize Git"** 授权
+4. 完成！
 
-**必须输入 `yes`**，不能按回车跳过！
+### 如果要求输入用户名和密码
+- **Username**：`yangxiaoling1222-eng`
+- **Password**：⚠️ **不是登录密码！** 需要输入 **Personal Access Token**
 
----
+#### 如何获取 Personal Access Token：
 
-### 步骤 10：验证成功
+1. 登录 GitHub → 点击右上角头像 → **Settings**
+2. 左侧菜单滚动到底部，点击 **Developer settings**
+3. 点击 **Personal access tokens** → **Tokens (classic)**
+4. 点击 **"Generate new token"** → **"Generate new token (classic)"**
+5. 填写：
+   - **Note**：`WorkBuddy 上传`
+   - **Expiration**：选择 `90 days` 或 `No expiration`
+   - **Select scopes**：勾选 `repo`（完整仓库权限）
+6. 滚动到底部，点击 **"Generate token"**
+7. **复制生成的 token**（只显示一次，务必保存好）
 
-打开浏览器，访问：
-```
-https://github.com/yangxiaoling1222-eng/Amazon-Ads-AI-E
-```
-
-应该能看到所有代码文件。
-
----
-
-## 3. 后续更新代码
-
-> 如果代码已有 Git 仓库，只需执行以下步骤更新
-
----
-
-### 步骤 1：进入项目目录
-
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
-```
+**推送时：**
+- **Username**：`yangxiaoling1222-eng`
+- **Password**：粘贴刚才复制的 **Personal Access Token**
 
 ---
 
-### 步骤 2：添加修改的文件
+## 七、验证上传结果
 
-```bash
-git add .
-```
+1. 打开 https://github.com/yangxiaoling1222-eng/Amazon-Ads-AI-E
+2. 确认以下文件 **已上传**：
+   - ✅ `README.md`
+   - ✅ `package.json`
+   - ✅ `server/` 目录
+   - ✅ `public/` 目录
+   - ✅ `.gitignore`
+   - ✅ `.env.example`
+
+3. 确认以下文件 **未上传**：
+   - ❌ `.env`（不应该出现）
+   - ❌ `node_modules/`（不应该出现）
+   - ❌ `*.db` 或 `*.sqlite`（不应该出现）
 
 ---
 
-### 步骤 3：检查修改内容
+## 八、后续更新代码（日常推送）
 
-```bash
+每次修改代码后，执行以下命令推送更新：
+
+```powershell
+# 进入项目目录
+cd "c:\Users\93178\WorkBuddy\20260429095857"
+
+# 查看修改了哪些文件
 git status
-```
 
-应该看到 `modified:` 列出发修改的文件。
+# 添加所有修改
+git add .
 
----
+# 提交（写上本次修改的说明）
+git commit -m "描述本次修改内容"
 
-### 步骤 4：提交修改
-
-```bash
-git commit -m "提交说明：本次修改了什么"
-```
-
----
-
-### 步骤 5：推送到 GitHub
-
-```bash
+# 推送到 GitHub
 git push
 ```
 
 ---
 
-## 4. 常见问题与解决
+## 九、常见问题
 
----
+### Q1: `git: command not found`
+**解决**：Git 未安装或未添加到 PATH，重新安装并选择 "Git from the command line and also from 3rd-party software"
 
-### ❌ 问题1：`git 不是内部或外部命令`
+### Q2: 推送时 `Authentication failed`
+**解决**：密码栏应该填 **Personal Access Token**，不是登录密码
 
-**原因**：Git 未安装或未添加到 PATH
-
-**解决**：
-1. 重新安装 Git：https://git-scm.com/download/win
-2. 安装时选择 **"Git from the command line and also from 3rd-party software"**
-3. 或者使用 **Git Bash**（自带 Git）
-
----
-
-### ❌ 问题2：`git: command not found`
-
-**解决**：关闭所有终端窗口，重新打开 Git Bash
-
----
-
-### ❌ 问题3：`nothing added to commit`
-
-**原因**：不在正确的项目目录中
+### Q3: 推送时 `! [rejected] main -> main (fetch first)`
+**原因**：远程仓库有你本地没有的提交
 
 **解决**：
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
-ls
+```powershell
+git pull
+git push
 ```
-确认看到 `server/`、`public/`、`package.json` 等文件
+如果弹出编辑器让你写合并信息，直接输入一行文字后保存退出即可。
 
----
-
-### ❌ 问题4：命令粘在一起（如 `Enter file...cat`）
-
-**原因**：两个命令写在一行
-
-**解决**：
-1. 按 `Ctrl + C` 取消
-2. **每个命令单独一行输入**
-3. 每行输完后**按回车执行**
-
----
-
-### ❌ 问题5：`Recv failure: Connection was reset`
-
-**原因**：网络无法访问 GitHub
-
-**解决**：使用 SSH 方式推送（本文档已使用 SSH）
-
----
-
-### ❌ 问题6：`Permission denied (publickey)`
-
-**原因**：SSH Key 未配置或未添加到 GitHub
-
-**解决**：
-1. 检查 SSH Key 是否存在：
-   ```bash
-   cat ~/.ssh/id_ed25519.pub
-   ```
-2. 如果没有，按 1.4 步骤重新生成
-3. 确认已在 GitHub 添加该 SSH Key
-
----
-
-### ❌ 问题7：忘记输入 `yes`
-
-**原因**：第一次连接 GitHub 时要求确认
-
-**解决**：重新执行推送，输入 `yes`
-
-```bash
-git push -u origin main
-```
-
----
-
-### ❌ 问题8：提交到错误的仓库
-
-**原因**：可能在错误的目录执行了 `git init`
-
-**解决**：检查当前目录
-```bash
-pwd
-git remote -v
-```
-确认 `origin` 指向正确的仓库地址
-
----
-
-### ❌ 问题9：不小心提交了敏感文件
-
-**立即解决**：
-```bash
+### Q4: 不小心提交了 `.env` 文件
+**立即执行**：
+```powershell
 git rm --cached .env
 echo ".env" >> .gitignore
 git commit -m "移除敏感文件"
 git push
 ```
+**然后撤销该密钥！**
 
----
-
-## 📝 快速命令清单
-
-### 首次上传
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
-git init
-git config user.name "yangxiaoling1222-eng"
-git config user.email "[email address removed]"
+### Q5: `.gitignore` 不生效
+**解决**：
+```powershell
+git rm -r --cached .
 git add .
-git commit -m "初始提交"
-git remote add origin git@github.com:yangxiaoling1222-eng/Amazon-Ads-AI-E.git
-git branch -M main
-git push -u origin main
-# 第一次会问 yes/no，输入 yes
-```
-
-### 后续更新
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
-git add .
-git commit -m "更新说明"
+git commit -m "修复 .gitignore"
 git push
 ```
 
-### 查看状态
-```bash
-cd /c/Users/93178/WorkBuddy/20260429095857
-git status
-git remote -v
+---
+
+## 十、快速命令汇总
+
+```powershell
+# 进入项目目录
+cd "c:\Users\93178\WorkBuddy\20260429095857"
+
+# 配置 Git
+git config --global user.name "yangxiaoling1222-eng"
+git config --global user.email "您的GitHub邮箱"
+git config --global init.defaultBranch main
+
+# 初始化并上传
+git init
+git add .
+git status  # 检查文件
+git commit -m "初始提交：WorkBuddy 亚马逊广告 AI 优化平台"
+git remote add origin https://github.com/yangxiaoling1222-eng/Amazon-Ads-AI-E.git
+git branch -M main
+git push -u origin main
+
+# 日常更新
+git add .
+git commit -m "描述修改内容"
+git push
 ```
 
 ---
 
-## 📁 本项目重要文件说明
+## 安全清单
 
-| 文件/目录 | 说明 | 是否上传 |
-|-----------|------|----------|
-| `.gitignore` | Git 忽略配置 | ✅ 上传 |
-| `.env.example` | 环境变量模板 | ✅ 上传 |
-| `.env` | 真实环境变量 | ❌ 不上传 |
-| `server/` | 后端代码 | ✅ 上传 |
-| `public/` | 前端代码 | ✅ 上传 |
-| `.workbuddy/` | 工作记忆 | ❌ 不上传 |
-| `node_modules/` | 依赖包 | ❌ 不上传 |
-| `*.db` | 数据库文件 | ❌ 不上传 |
+上传前确认：
+- [ ] `.env` 文件不在 `git status` 列表中
+- [ ] `node_modules/` 不在 `git status` 列表中
+- [ ] 没有硬编码的 API 密钥
+- [ ] GitHub 仓库设置为 **Private**
 
 ---
 
-## 🎯 本项目注意事项
+**祝您上传顺利！** 🚀
 
-1. **必须使用 Git Bash**，不要用 PowerShell 执行 Git 命令
-2. **必须使用 SSH 方式**，不要用 HTTPS（已配置）
-3. **SSH Key 只需配置一次**，以后无需重复
-4. **每次命令单独输入**，不要合并成一行
-5. **第一次推送输入 `yes`** 确认连接
-
----
-
-*教程更新时间：2026-05-11*
-*基于成功上传路径整理*
+如有问题，请随时询问。😊
