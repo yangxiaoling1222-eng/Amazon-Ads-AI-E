@@ -1744,7 +1744,7 @@
   </div>
 
   <script>
-    const API_BASE = 'http://localhost:3000/api';
+    const API_BASE = '/api';
     let targets = [];
     let portfolios = [];
     let currentEditingId = null;
@@ -2673,7 +2673,7 @@
     // ─────────────────────────────────────────────────────────────────
     // AI 对话功能（来自 ai-agent.html）
     // ─────────────────────────────────────────────────────────────────
-    const CHAT_API = 'http://localhost:3000/api';
+    const CHAT_API = '/api';
     let chatSessionId = 'sess-' + Math.random().toString(36).slice(2, 10);
     let chatSafeMode = true;
     let chatIsThinking = false;
@@ -3028,7 +3028,7 @@
     // ─────────────────────────────────────────────────────────────────
     // 关键词收割功能（来自 keyword-harvest.html）
     // ─────────────────────────────────────────────────────────────────
-    const HV_API = 'http://localhost:3000/api';
+    const HV_API = '/api';
     let hvData = { harvest:[], negate:[], info:[] };
     let hvCurrentTab = 'harvest';
     let hvPending = null;
@@ -3234,7 +3234,7 @@
     //  关键词管理
     // ═══════════════════════════════════════════════════════════════
 
-    const KW_API = 'http://localhost:3000/api/keywords';
+    const KW_API = '/api/keywords';
 
     // 加载标签概览
     async function loadKeywordTags() {
