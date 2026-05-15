@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>系统设置 - 亚马逊广告AI专家</title>
+  <!-- 认证脚本 -->
+  <script src="/js/auth.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -570,6 +572,29 @@
                     </div>
                   </div>
                 </label>
+              </div>
+            </div>
+
+            <!-- 安全设置 -->
+            <div class="settings-section">
+              <div class="section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                安全设置
+              </div>
+              <div class="section-body">
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <div class="setting-label">访问密码</div>
+                    <div class="setting-desc">设置系统访问密码，保护数据安全</div>
+                  </div>
+                  <div class="setting-control">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="password" class="input" id="new-password" placeholder="输入新密码（留空保持不变）" style="width: 200px;">
+                      <button class="btn btn-outline" onclick="changePassword()">修改密码</button>
+                      <button class="btn" onclick="logout()" style="background: #ef4444; margin-left: 8px;">退出登录</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -1198,6 +1223,32 @@
         return false;
       }
       return true;
+    }
+    
+    // 修改密码
+    async function changePassword() {
+      const newPassword = document.getElementById('new-password').value;
+      if (!newPassword) {
+        showToast('请输入新密码', 'error');
+        return;
+      }
+      
+      try {
+        // 注意：实际生产环境中需要添加后端密码修改接口
+        // 这里只是前端提示，实际密码修改需要在服务器端 .env 中设置
+        showToast('密码修改功能需要在服务器 .env 文件中设置 SYSTEM_PASSWORD', 'info');
+        document.getElementById('new-password').value = '';
+      } catch (e) {
+        showToast('修改失败: ' + e.message, 'error');
+      }
+    }
+    
+    // 退出登录
+    function logout() {
+      if (confirm('确定要退出登录吗？')) {
+        localStorage.removeItem('session_token');
+        window.location.href = '/login.html';
+      }
     }
 
     // 页面加载时检查API配置状态

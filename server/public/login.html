@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - 亚马逊广告AI专家平台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .login-container {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 400px;
+      margin: 20px;
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo h1 {
+      font-size: 24px;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+    .logo p {
+      color: #666;
+      font-size: 14px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .error {
+      color: #ef4444;
+      font-size: 14px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+    }
+    .error.show { display: block; }
+    .tip {
+      text-align: center;
+      margin-top: 20px;
+      color: #999;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="logo">
+      <h1>🔐 亚马逊广告AI专家平台</h1>
+      <p>请输入访问密码</p>
+    </div>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="password">访问密码</label>
+        <input type="password" id="password" placeholder="请输入密码" required>
+      </div>
+      <button type="submit" class="btn" id="loginBtn">登录</button>
+      <p class="error" id="errorMsg">密码错误，请重试</p>
+    </form>
+    
+    <p class="tip">默认密码: 123456</p>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const password = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    
+    // 跳转到首页
+    const targetPage = new URLSearchParams(window.location.search).get('redirect') || 'index.html';
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.classList.remove('show');
+      loginBtn.disabled = true;
+      loginBtn.textContent = '登录中...';
+      
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: password.value })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          // 保存 token
+          if (data.token) {
+            localStorage.setItem('session_token', data.token);
+          }
+          // 跳转到目标页面
+          window.location.href = targetPage;
+        } else {
+          errorMsg.textContent = data.error || '密码错误';
+          errorMsg.classList.add('show');
+          loginBtn.disabled = false;
+          loginBtn.textContent = '登录';
+        }
+      } catch (err) {
+        errorMsg.textContent = '网络错误，请重试';
+        errorMsg.classList.add('show');
+        loginBtn.disabled = false;
+        loginBtn.textContent = '登录';
+      }
+    });
+    
+    // 尝试自动登录（如果已有有效token）
+    (async function() {
+      const token = localStorage.getItem('session_token');
+      if (token) {
+        try {
+          const res = await fetch('/api/auth/status', {
+            headers: { 'X-Session-Token': token }
+          });
+          const data = await res.json();
+          if (data.loggedIn) {
+            window.location.href = targetPage;
+          }
+        } catch (e) {}
+      }
+    })();
+  </script>
+</body>
+</html>

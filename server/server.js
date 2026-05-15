@@ -7,6 +7,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 
 // 导入数据库
 const db = require('./config/database');
@@ -24,13 +25,121 @@ const keywordRoutes = require('./routes/keywords');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 访问密码配置（默认空，即不启用）
+const SYSTEM_PASSWORD = process.env.SYSTEM_PASSWORD || '';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'workbuddy-secret-' + Date.now();
+
 // 中间件
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 静态文件服务（如果需要）
-app.use(express.static(path.join(__dirname, '../public')));
+// 简单的会话管理（内存存储）
+const sessions = new Map();
+
+// 密码验证中间件
+function authMiddleware(req, res, next) {
+  // 如果没有设置密码，直接通过
+  if (!SYSTEM_PASSWORD) {
+    return next();
+  }
+  
+  // 检查 session token
+  const token = req.headers['x-session-token'];
+  if (token && sessions.has(token)) {
+    const session = sessions.get(token);
+    if (session.expiry > Date.now()) {
+      return next();
+    }
+    sessions.delete(token);
+  }
+  
+  // 返回未授权
+  res.status(401).json({ error: '需要登录', needLogin: true });
+}
+
+// 登录接口
+app.post('/api/auth/login', (req, res) => {
+  const { password } = req.body;
+  
+  if (!SYSTEM_PASSWORD) {
+    return res.json({ success: true, message: '未设置密码保护' });
+  }
+  
+  if (password === SYSTEM_PASSWORD) {
+    // 生成 session token
+    const token = crypto.randomBytes(32).toString('hex');
+    sessions.set(token, {
+      expiry: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7天过期
+      createdAt: Date.now()
+    });
+    
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ success: false, error: '密码错误' });
+  }
+});
+
+// 登出接口
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.headers['x-session-token'];
+  if (token) {
+    sessions.delete(token);
+  }
+  res.json({ success: true });
+});
+
+// 检查登录状态
+app.get('/api/auth/status', (req, res) => {
+  if (!SYSTEM_PASSWORD) {
+    return res.json({ loggedIn: true, hasPassword: false });
+  }
+  
+  const token = req.headers['x-session-token'];
+  if (token && sessions.has(token)) {
+    const session = sessions.get(token);
+    if (session.expiry > Date.now()) {
+      return res.json({ loggedIn: true, hasPassword: true });
+    }
+    sessions.delete(token);
+  }
+  
+  res.json({ loggedIn: false, hasPassword: true });
+});
+
+// 静态文件服务（带登录检查）
+app.use(express.static(path.join(__dirname, '../public'), {
+  index: false // 禁用默认index
+}));
+
+// HTML页面访问时检查登录状态
+app.get('/:page.html', (req, res, next) => {
+  // 登录页和静态资源不需要验证
+  if (req.params.page === 'login' || req.params.page === 'service-worker') {
+    return next();
+  }
+  
+  // 如果没有设置密码，直接通过
+  if (!SYSTEM_PASSWORD) {
+    return next();
+  }
+  
+  // 检查 session token
+  const token = req.headers['x-session-token'] || 
+                req.query.token ||
+                req.headers.cookie?.split(';').find(c => c.trim().startsWith('session_token='))?.split('=')[1];
+  
+  if (token && sessions.has(token)) {
+    const session = sessions.get(token);
+    if (session.expiry > Date.now()) {
+      return next();
+    }
+    sessions.delete(token);
+  }
+  
+  // 未登录，跳转到登录页
+  res.redirect('/login.html?redirect=' + encodeURIComponent(req.originalUrl));
+});
 
 // 任务路由
 const taskRoutes = require('./routes/tasks');
@@ -68,14 +177,14 @@ app.get('/api/history/:id', (req, res) => {
   }
 });
 
-// API路由
-app.use('/api/config', configRoutes);
-app.use('/api/lingxing', lingxingRoutes);
-app.use('/api/amazon', amazonRoutes);
-app.use('/api/agent', agentRoutes);
-app.use('/api/scheduler', schedulerRoutes);
-app.use('/api/keywords', keywordRoutes);
-app.use('/api', apiRoutes);
+// API路由（添加密码验证）
+app.use('/api/config', authMiddleware, configRoutes);
+app.use('/api/lingxing', authMiddleware, lingxingRoutes);
+app.use('/api/amazon', authMiddleware, amazonRoutes);
+app.use('/api/agent', authMiddleware, agentRoutes);
+app.use('/api/scheduler', authMiddleware, schedulerRoutes);
+app.use('/api/keywords', authMiddleware, keywordRoutes);
+app.use('/api', authMiddleware, apiRoutes);
 
 // 健康检查
 app.get('/health', (req, res) => {
