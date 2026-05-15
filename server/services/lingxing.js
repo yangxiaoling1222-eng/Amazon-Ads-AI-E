@@ -89,11 +89,12 @@ class LingxingService {
 
   /**
    * 生成签名 sign
-   * 根据领星文档规则:
-   * 1. 参数按 ASCII 排序（access_token, app_key, timestamp）
-   * 2. 拼成 key1=value1&key2=value2... 格式
-   * 3. MD5(32位) 后转大写
-   * 4. AES/ECB/PKCS5Padding 加密，密钥 = appId
+   * 根据领星文档规则（5步）:
+   * 步骤1: 将所有参数（业务参数 + access_token + app_key + timestamp）按 ASCII 排序
+   * 步骤2: 拼接为 key1=value1&key2=value2 格式（value为空不参与，value为null会参与）
+   * 步骤3: 对拼接字符串进行MD5(32位)加密并转大写
+   * 步骤4: 使用AES/ECB/PKCS5Padding加密MD5值，密钥为AppId
+   * 步骤5: 对最终签名进行URL编码后使用
    */
   generateSign(params) {
     // 1. 按 ASCII 排序参数
@@ -105,11 +106,11 @@ class LingxingService {
       .map(key => `${key}=${params[key]}`);
     
     const paramString = paramPairs.join('&');
-    console.log('签名原文:', paramString);
+    console.log('[签名] 原文:', paramString);
     
     // 3. MD5(32位) 后转大写
     const md5Hash = crypto.createHash('md5').update(paramString).digest('hex').toUpperCase();
-    console.log('MD5结果:', md5Hash);
+    console.log('[签名] MD5:', md5Hash);
     
     // 4. AES/ECB/PKCS5Padding 加密，密钥 = appId
     const key = this.padKey(this.appId);
@@ -118,8 +119,13 @@ class LingxingService {
     let encrypted = cipher.update(md5Hash, 'utf8', 'base64');
     encrypted += cipher.final('base64');
     
-    console.log('AES加密结果:', encrypted);
-    return encrypted;
+    console.log('[签名] AES结果:', encrypted);
+    
+    // 5. URL 编码
+    const signEncoded = encodeURIComponent(encrypted);
+    console.log('[签名] URL编码后:', signEncoded);
+    
+    return signEncoded;
   }
 
   /**
@@ -160,7 +166,8 @@ class LingxingService {
 
       console.log('Token响应:', JSON.stringify(response.data));
 
-      if (response.data.code === '200' || response.data.code === 200) {
+      // 领星返回 code: 0 表示成功（不是200）
+      if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
         this.accessToken = response.data.data.access_token;
         this.refreshToken = response.data.data.refresh_token;
         // expires_in 单位是秒，提前5分钟过期
@@ -197,7 +204,7 @@ class LingxingService {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
 
-      if (response.data.code === '200' || response.data.code === 200) {
+      if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
         this.accessToken = response.data.data.access_token;
         this.refreshToken = response.data.data.refresh_token;
         this.tokenExpiry = Date.now() + (response.data.data.expires_in - 300) * 1000;
@@ -265,7 +272,7 @@ class LingxingService {
       console.log(`[${method}] ${endpoint}`);
       const response = await axios(config);
       
-      if (response.data.code === '200' || response.data.code === 200) {
+      if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
         return response.data.data;
       } else {
         throw new Error(response.data.msg || `API错误: ${response.data.code}`);
