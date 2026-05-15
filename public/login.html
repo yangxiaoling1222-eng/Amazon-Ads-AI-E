@@ -209,10 +209,13 @@
   </div>
 
   <script>
-    const API_BASE = 'http://localhost:3000/api';
+    // 自动检测 API 地址（本地或服务器）
+    const API_BASE = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000/api' 
+      : `${window.location.protocol}//${window.location.host}/api`;
     
     // 如果已登录，直接跳转到首页
-    if (localStorage.getItem('currentUser')) {
+    if (localStorage.getItem('sessionToken')) {
       window.location.href = 'index.html';
     }
     
@@ -229,37 +232,42 @@
       errorMessage.classList.remove('show');
       errorMessage.textContent = '';
       
+      // 前端验证
+      if (!email || !password) {
+        errorMessage.textContent = '请输入邮箱和密码';
+        errorMessage.classList.add('show');
+        return;
+      }
+      
       // 禁用按钮
       loginBtn.disabled = true;
       loginBtn.textContent = '登录中...';
       
       try {
-        // 调用登录API
+        console.log('登录请求:', API_BASE + '/auth/login', { password: '***' });
+        
+        // 调用系统密码验证API
         const response = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ password: password })
         });
         
+        console.log('响应状态:', response.status);
         const data = await response.json();
+        console.log('响应数据:', data);
         
-        if (!response.ok) {
-          throw new Error(data.error || '登录失败');
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || '密码错误');
         }
         
-        // 保存用户信息
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        // 保存 session token
+        localStorage.setItem('sessionToken', data.token);
         
-        // 跳转到首页
-        window.location.href = 'index.html';
-        
-      } catch (error) {
-        // 如果API调用失败，尝试使用本地数据进行演示
-        console.log('API登录失败，使用本地演示数据:', error.message);
-        
-        // 演示模式：根据邮箱匹配用户
+        // 同时保存用户信息（用于角色权限控制）
         const demoUsers = {
           'admin@example.com': {
             id: 'U001',
@@ -298,14 +306,22 @@
           }
         };
         
-        const user = demoUsers[email];
-        if (user && password === '123456') {
-          localStorage.setItem('currentUser', JSON.stringify(user));
-          window.location.href = 'index.html';
-        } else {
-          errorMessage.textContent = '邮箱或密码错误';
-          errorMessage.classList.add('show');
-        }
+        const user = demoUsers[email] || {
+          id: 'U001',
+          name: email.split('@')[0],
+          email: email,
+          role: 'admin',
+          stores: 'store_us,store_uk,store_de,store_jp'
+        };
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        
+        // 跳转到首页或之前的页面
+        const redirect = new URLSearchParams(window.location.search).get('redirect') || 'index.html';
+        window.location.href = redirect;
+        
+      } catch (error) {
+        errorMessage.textContent = error.message || '登录失败，请检查密码';
+        errorMessage.classList.add('show');
       } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = '登录';

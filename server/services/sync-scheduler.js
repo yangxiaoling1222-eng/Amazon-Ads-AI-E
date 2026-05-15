@@ -77,28 +77,50 @@ async function _syncStore(storeId, startDate, endDate) {
 
 function _saveStores(stores) {
   if (!stores || stores.length === 0) return;
+  console.log(`[同步] 收到 ${stores.length} 个店铺，准备保存...`);
   const stmt = db.getDb().prepare(
     `INSERT OR REPLACE INTO sync_stores (store_id, store_name, marketplace, region, status, last_sync_at)
      VALUES (?, ?, ?, ?, ?, datetime('now'))`
   );
+  let savedCount = 0;
   stores.forEach(s => {
     try {
-      stmt.run(s.store_id || s.id, s.store_name || s.name || '', s.marketplace || '', s.region || '', s.status || 'active');
-    } catch (e) {}
+      // 领星API字段映射: sid, name, country, region, status
+      stmt.run(s.sid || s.id, s.name || '', s.country || s.marketplace_id || '', s.region || '', s.status || 'active');
+      savedCount++;
+    } catch (e) {
+      console.error('[保存店铺失败]', e.message, s);
+    }
   });
+  console.log(`[同步] 店铺保存完成: ${savedCount}/${stores.length}`);
 }
 
 function _saveProducts(products) {
   if (!products || products.length === 0) return;
+  console.log(`[同步] 收到 ${products.length} 个产品，准备保存...`);
   const stmt = db.getDb().prepare(
     `INSERT OR REPLACE INTO sync_products (sku_id, sku, asin, name, img, status, store_id, last_sync_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   );
+  let savedCount = 0;
   products.forEach(p => {
     try {
-      stmt.run(p.sku_id || p.id || p.sku, p.sku || '', p.asin || '', p.name || '', p.img || '', p.status || 'active', p.store_id || '');
-    } catch (e) {}
+      // 领星产品API字段映射
+      stmt.run(
+        p.sku_id || p.id || p.sku || '',
+        p.sku || p.msku || '',
+        p.asin || p.asin1 || '',
+        p.name || p.title || p.product_name || '',
+        p.img || p.image || p.main_image || '',
+        p.status || 'active',
+        p.sid || p.store_id || ''
+      );
+      savedCount++;
+    } catch (e) {
+      console.error('[保存产品失败]', e.message, JSON.stringify(p).substring(0, 200));
+    }
   });
+  console.log(`[同步] 产品保存完成: ${savedCount}/${products.length}`);
 }
 
 function _saveCampaigns(campaigns) {

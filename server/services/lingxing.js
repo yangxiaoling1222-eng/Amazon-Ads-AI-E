@@ -13,14 +13,36 @@
  *    d) AES/ECB/PKCS5Padding 加密，密钥 = appId
  *
  * API 接口路径（来自官方文档）:
- * - 店铺列表:   /erp/sc/data/seller/lists          (GET)
- * - 广告组合:   /pb/openapi1/newad/portfolios        (POST)
- * - SP广告活动: /pb/openapi1/newad/spCampaigns       (POST)
- * - SP广告组:   /pb/openapi1/newad/spGroups          (POST)
- * - SP广告商品: /pb/openapi1/newad/spProductAds      (POST)
- * - SP关键词:   /pb/openapi1/newad/spKeywords        (POST)
- * - SP否定投放: /pb/openapi1/newad/spNegTargets      (POST)
- * - 本地产品列表: /erp/sc/routing/data/local_inventory/productList (POST)
+ * 【基础数据】
+ * - 店铺列表:       /erp/sc/data/seller/lists              (GET)
+ * 
+ * 【广告数据 - 列表】
+ * - 广告组合:       /pb/openapi/newad/portfolios             (POST)
+ * - SP广告活动:     /pb/openapi/newad/spCampaigns           (POST)
+ * - SP广告组:       /pb/openapi/newad/spAdGroups            (POST)  ← 修复：原 spGroups
+ * - SP广告商品:     /pb/openapi/newad/spProductAds          (POST)
+ * - SP关键词:       /pb/openapi/newad/spKeywords            (POST)
+ * - SP商品定位:     /pb/openapi/newad/spTargets             (POST)  ← 新增
+ * - SP否定投放:     /pb/openapi/newad/spNegativeTargetsOrKeywords (POST) ← 修复：原 spNegTargets
+ * 
+ * 【广告数据 - 报告】
+ * - 搜索词报告:     /pb/openapi/newad/queryWordReports      (POST)  ← 新增
+ * - 关键词报告:     /pb/openapi/newad/spKeywordReports       (POST)  ← 新增
+ * - 商品定位报告:   /pb/openapi/newad/spTargetReports        (POST)  ← 新增
+ * - 广告位报告:     /pb/openapi/newad/campaignPlacementReports (POST) ← 新增
+ * - SP广告活动报告: /pb/openapi/newad/spCampaignReports      (POST)  ← 新增
+ * - SP广告组报告:   /pb/openapi/newad/spAdGroupReports       (POST)  ← 新增
+ * - SP商品报告:     /pb/openapi/newad/spProductAdReports    (POST)  ← 新增
+ * - ASIN报告:       /pb/openapi/newad/asinReports           (POST)  ← 新增
+ * 
+ * 【分时数据】
+ * - SP广告活动小时: /pb/openapi/newad/spCampaignHourData    (POST)  ← 新增
+ * - SP广告组小时:   /pb/openapi/newad/spAdGroupHourData      (POST)  ← 新增
+ * - SP广告位小时:   /pb/openapi/newad/spAdPlacementHourData  (POST)  ← 新增
+ * 
+ * 【HSA广告报告】
+ * - HSA搜索词报告:  /pb/openapi/newad/hsaQueryWordReports   (POST)  ← 新增
+ * - HSA关键词报告:  /pb/openapi/newad/listHsaKeywordPlacementReport (POST) ← 新增
  */
 
 const axios = require('axios');
@@ -245,11 +267,16 @@ class LingxingService {
   async request(method, endpoint, bizParams = {}, bizData = null) {
     const commonParams = await this.buildCommonParams();
     
-    // 合并公共参数和业务参数
-    const allParams = { ...commonParams, ...bizParams };
+    // 合并公共参数和业务参数（用于签名）
+    let signParams = { ...commonParams, ...bizParams };
+    if (method === 'POST' && bizData) {
+      // 把 body 参数也加入签名
+      signParams = { ...signParams, ...bizData };
+    }
     
-    // 构建 URL
-    const queryString = Object.entries(allParams)
+    // 构建 URL（只放公共参数 + URL 业务参数）
+    const urlParams = { ...commonParams, ...bizParams };
+    const queryString = Object.entries(urlParams)
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
     
@@ -259,7 +286,8 @@ class LingxingService {
       method,
       url,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-API-VERSION': '2'  // 使用 offset 分页模式
       }
     };
     
@@ -305,6 +333,8 @@ class LingxingService {
     }
   }
 
+  // ==================== 基础数据接口 ====================
+
   /**
    * 获取店铺列表
    * API: /erp/sc/data/seller/lists (GET)
@@ -317,9 +347,11 @@ class LingxingService {
     return await this.request('GET', '/erp/sc/data/seller/lists', {});
   }
 
+  // ==================== 广告列表接口 ====================
+
   /**
    * 获取广告组合列表
-   * API: /pb/openapi1/newad/portfolios (POST)
+   * API: /pb/openapi/newad/portfolios (POST)
    */
   async getPortfolios(params = {}) {
     if (this.mockMode) {
@@ -330,8 +362,8 @@ class LingxingService {
       }
       return campaigns;
     }
-    return await this.request('POST', '/pb/openapi1/newad/portfolios', {}, {
-      sid: params.sid,
+    return await this.request('POST', '/pb/openapi/newad/portfolios', {}, {
+      sid: params.sid || params.storeId,
       profile_id: params.profileId,
       offset: params.offset || 0,
       length: params.length || 15
@@ -340,7 +372,7 @@ class LingxingService {
 
   /**
    * 获取SP广告活动列表
-   * API: /pb/openapi1/newad/spCampaigns (POST)
+   * API: /pb/openapi/newad/spCampaigns (POST)
    */
   async getCampaigns(params = {}) {
     if (this.mockMode) {
@@ -351,8 +383,8 @@ class LingxingService {
       }
       return campaigns;
     }
-    return await this.request('POST', '/pb/openapi1/newad/spCampaigns', {}, {
-      sid: params.sid,
+    return await this.request('POST', '/pb/openapi/newad/spCampaigns', {}, {
+      sid: params.sid || params.storeId,
       profile_id: params.profileId,
       state: params.state || 'enabled',
       offset: params.offset || 0,
@@ -361,7 +393,394 @@ class LingxingService {
   }
 
   /**
-   * 获取广告报告数据
+   * 获取SP广告组列表
+   * API: /pb/openapi/newad/spAdGroups (POST)  ← 修复：原 spGroups
+   */
+  async getAdGroups(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告组列表');
+      return [];
+    }
+    return await this.request('POST', '/pb/openapi/newad/spAdGroups', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      campaign_id: params.campaignId,
+      state: params.state || 'enabled',
+      offset: params.offset || 0,
+      length: params.length || 15
+    });
+  }
+
+  /**
+   * 获取SP广告商品列表
+   * API: /pb/openapi/newad/spProductAds (POST)
+   */
+  async getProductAds(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告商品列表');
+      return [];
+    }
+    return await this.request('POST', '/pb/openapi/newad/spProductAds', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      ad_group_id: params.adGroupId,
+      campaign_id: params.campaignId,
+      state: params.state || 'enabled',
+      offset: params.offset || 0,
+      length: params.length || 15
+    });
+  }
+
+  /**
+   * 获取SP关键词列表
+   * API: /pb/openapi/newad/spKeywords (POST)
+   */
+  async getKeywords(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回关键词列表');
+      return [];
+    }
+    return await this.request('POST', '/pb/openapi/newad/spKeywords', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      ad_group_id: params.adGroupId,
+      campaign_id: params.campaignId,
+      state: params.state || 'enabled',
+      offset: params.offset || 0,
+      length: params.length || 15
+    });
+  }
+
+  /**
+   * 获取SP商品定位列表
+   * API: /pb/openapi/newad/spTargets (POST)  ← 新增
+   */
+  async getTargets(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回商品定位列表');
+      return [];
+    }
+    return await this.request('POST', '/pb/openapi/newad/spTargets', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      ad_group_id: params.adGroupId,
+      campaign_id: params.campaignId,
+      state: params.state || 'enabled',
+      offset: params.offset || 0,
+      length: params.length || 15
+    });
+  }
+
+  /**
+   * 获取SP否定投放列表
+   * API: /pb/openapi/newad/spNegativeTargetsOrKeywords (POST)  ← 修复：原 spNegTargets
+   */
+  async getNegativeTargetsOrKeywords(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回否定投放列表');
+      return [];
+    }
+    return await this.request('POST', '/pb/openapi/newad/spNegativeTargetsOrKeywords', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      campaign_id: params.campaignId,
+      ad_group_id: params.adGroupId,
+      target_type: params.targetType || 'keyword',  // keyword / target
+      offset: params.offset || 0,
+      length: params.length || 15
+    });
+  }
+
+  // ==================== 报告接口 ====================
+
+  /**
+   * 获取搜索词报告（关键词收割核心接口）
+   * API: /pb/openapi/newad/queryWordReports (POST)  ← 新增
+   * 说明: 获取用户搜索词数据，用于分析哪些词带来了转化
+   * 
+   * @param {Object} params
+   * @param {string} params.sid - 店铺id
+   * @param {string} params.reportDate - 报表日期 Y-m-d
+   * @param {string} params.targetType - 投放类型: keyword(关键词) / target(商品投放)
+   */
+  async getSearchTermReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回搜索词报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/queryWordReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      target_type: params.targetType || 'keyword',
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取关键词报告
+   * API: /pb/openapi/newad/spKeywordReports (POST)  ← 新增
+   * 说明: 获取关键词维度的广告表现数据
+   */
+  async getKeywordReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回关键词报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spKeywordReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取商品定位报告（ASIN定向分析）
+   * API: /pb/openapi/newad/spTargetReports (POST)  ← 新增
+   * 说明: 获取商品定位维度的广告表现数据
+   */
+  async getTargetReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回商品定位报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spTargetReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取广告位报告（分时出价核心接口）
+   * API: /pb/openapi/newad/campaignPlacementReports (POST)  ← 新增
+   * 说明: 获取广告位维度的表现数据，包括 TOP OF SEARCH / PRODUCT PAGE 等
+   * placement_type 示例: TOP OF SEARCH ON-AMAZON, OTHER ON-AMAZON
+   */
+  async getPlacementReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告位报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/campaignPlacementReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取SP广告活动报告
+   * API: /pb/openapi/newad/spCampaignReports (POST)  ← 新增
+   */
+  async getCampaignReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告活动报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spCampaignReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取SP广告组报告
+   * API: /pb/openapi/newad/spAdGroupReports (POST)  ← 新增
+   */
+  async getAdGroupReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告组报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spAdGroupReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取SP广告商品报告
+   * API: /pb/openapi/newad/spProductAdReports (POST)  ← 新增
+   */
+  async getProductAdReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告商品报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spProductAdReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取ASIN报告
+   * API: /pb/openapi/newad/asinReports (POST)  ← 新增
+   */
+  async getAsinReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回ASIN报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/asinReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  // ==================== 分时数据接口 ====================
+
+  /**
+   * 获取SP广告活动小时数据（分时出价核心接口）
+   * API: /pb/openapi/newad/spCampaignHourData (POST)  ← 新增
+   */
+  async getCampaignHourData(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告活动小时数据');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spCampaignHourData', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      campaign_id: params.campaignId,
+      report_date: params.reportDate || params.startDate,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取SP广告组小时数据
+   * API: /pb/openapi/newad/spAdGroupHourData (POST)  ← 新增
+   */
+  async getAdGroupHourData(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告组小时数据');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spAdGroupHourData', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      campaign_id: params.campaignId,
+      ad_group_id: params.adGroupId,
+      report_date: params.reportDate || params.startDate,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取SP广告位小时数据
+   * API: /pb/openapi/newad/spAdPlacementHourData (POST)  ← 新增
+   */
+  async getAdPlacementHourData(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回广告位小时数据');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/spAdPlacementHourData', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      campaign_id: params.campaignId,
+      report_date: params.reportDate || params.startDate,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  // ==================== HSA广告报告接口 ====================
+
+  /**
+   * 获取HSA搜索词报告
+   * API: /pb/openapi/newad/hsaQueryWordReports (POST)  ← 新增
+   */
+  async getHsaQueryWordReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回HSA搜索词报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/hsaQueryWordReports', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  /**
+   * 获取HSA关键词广告位报告
+   * API: /pb/openapi/newad/listHsaKeywordPlacementReport (POST)  ← 新增
+   */
+  async getHsaKeywordPlacementReport(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回HSA关键词广告位报告');
+      return { data: [], total: 0 };
+    }
+    return await this.request('POST', '/pb/openapi/newad/listHsaKeywordPlacementReport', {}, {
+      sid: params.sid || params.storeId,
+      profile_id: params.profileId,
+      report_date: params.reportDate || params.startDate,
+      show_detail: params.showDetail ? 1 : 0,
+      offset: params.offset || 0,
+      length: params.length || 100
+    });
+  }
+
+  // ==================== 产品数据接口 ====================
+
+  /**
+   * 获取本地产品列表
+   * API: /erp/sc/routing/data/local_inventory/productList (POST)
+   */
+  async getProducts(params = {}) {
+    if (this.mockMode) {
+      console.log('[Mock] 返回产品列表');
+      let products = MOCK_DATA.products;
+      if (params.storeId) {
+        products = products.filter(p => p.store_id === params.storeId);
+      }
+      return products;
+    }
+    return await this.request('POST', '/erp/sc/routing/data/local_inventory/productList', {}, {
+      offset: params.offset || 0,
+      length: params.length || 1000
+    });
+  }
+
+  // ==================== 报告数据接口（兼容旧接口） ====================
+
+  /**
+   * 获取广告报告数据（兼容旧接口，使用SP广告活动报告）
    * 注意：领星文档中未明确提供报告接口，使用模拟数据
    */
   async getAdReport(params = {}) {
@@ -446,24 +865,7 @@ class LingxingService {
     });
   }
 
-  /**
-   * 获取本地产品列表
-   * API: /erp/sc/routing/data/local_inventory/productList (POST)
-   */
-  async getProducts(params = {}) {
-    if (this.mockMode) {
-      console.log('[Mock] 返回产品列表');
-      let products = MOCK_DATA.products;
-      if (params.storeId) {
-        products = products.filter(p => p.store_id === params.storeId);
-      }
-      return products;
-    }
-    return await this.request('POST', '/erp/sc/routing/data/local_inventory/productList', {}, {
-      offset: params.offset || 0,
-      length: params.length || 1000
-    });
-  }
+  // ==================== 数据同步接口 ====================
 
   /**
    * 同步广告数据

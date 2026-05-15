@@ -949,8 +949,8 @@ router.post('/ai/query', async (req, res) => {
 
 // ============ 认证接口 ============
 
-// 用户登录
-router.post('/auth/login', (req, res) => {
+// 用户登录（用户管理系统的登录，非系统密码保护）
+router.post('/auth/user-login', (req, res) => {
   try {
     const { email, password } = req.body;
     
