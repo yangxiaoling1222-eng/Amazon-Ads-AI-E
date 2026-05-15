@@ -859,162 +859,90 @@ router.post('/ai/analyze-task', async (req, res) => {
   }
 });
 
-// AI 自然语言查询
+// AI 自然语言查询（复用 agent.js 的 loadAiConfig + agentChat，保持配置统一）
 router.post('/ai/query', async (req, res) => {
   try {
-    const { query, storeId, model } = req.body;
-
+    const { query } = req.body;
     if (!query) {
       return res.status(400).json({ success: false, error: '缺少查询内容' });
     }
 
-    console.log('\n========== AI 查询开始 ==========');
-    console.log('查询:', query);
-    console.log('店铺:', storeId);
-    console.log('模型:', model);
+    // ── 复用 agent.js 中已验证的 loadAiConfig 逻辑 ──
+    const fs   = require('fs');
+    const path = require('path');
+    const BetterSQLite3 = require('better-sqlite3');
+    const dbPath = path.join(__dirname, '../data/ads_platform.db');
+    let rows = [];
+    try {
+      const diskDb = new BetterSQLite3(dbPath, { readonly: true });
+      rows = diskDb.prepare(
+        "SELECT config_key, config_value FROM api_config WHERE config_key IN ('aiProvider','siliconflow','openrouter','openai','custom')"
+      ).all();
+      diskDb.close();
+    } catch (e) {
+      rows = db.query(
+        "SELECT config_key, config_value FROM api_config WHERE config_key IN ('aiProvider','siliconflow','openrouter','openai','custom')"
+      );
+    }
 
-    // 从数据库获取 AI 配置
-    const configs = db.query('SELECT config_key, config_value FROM api_config WHERE config_key IN (?, ?, ?, ?, ?, ?)',
-      ['aiProvider', 'siliconflow', 'openrouter', 'openai', 'custom', 'amazon']);
-
-    let aiConfig = {};
-    configs.forEach(c => {
-      try {
-        aiConfig[c.config_key] = JSON.parse(c.config_value);
-      } catch (e) {}
+    const cfg = {};
+    rows.forEach(r => {
+      try { cfg[r.config_key] = JSON.parse(r.config_value); } catch (_) { cfg[r.config_key] = r.config_value; }
     });
 
-    // 确定使用哪个 AI 配置（由 aiProvider 决定）
+    const provider = cfg.aiProvider || 'siliconflow';
     let apiKey, baseUrl, selectedModel;
-    const sel = aiConfig.aiProvider || 'siliconflow';
-
-    if (sel === 'siliconflow' && aiConfig.siliconflow?.apiKey) {
-      apiKey = aiConfig.siliconflow.apiKey;
+    if (provider === 'openrouter' && cfg.openrouter?.apiKey) {
+      apiKey = cfg.openrouter.apiKey;
+      baseUrl = cfg.openrouter.baseUrl || 'https://openrouter.ai/api/v1';
+      selectedModel = cfg.openrouter.model || 'openai/gpt-4o-mini';
+    } else if (provider === 'siliconflow' && cfg.siliconflow?.apiKey) {
+      apiKey = cfg.siliconflow.apiKey;
       baseUrl = 'https://api.siliconflow.cn/v1';
-      selectedModel = model || aiConfig.siliconflow.model || 'Qwen/Qwen3-8B';
-    } else if (sel === 'openrouter' && aiConfig.openrouter?.apiKey) {
-      apiKey = aiConfig.openrouter.apiKey;
-      baseUrl = aiConfig.openrouter.baseUrl || 'https://openrouter.ai/api/v1';
-      selectedModel = model || aiConfig.openrouter.model || 'openrouter/free';
-    } else if (sel === 'openai' && aiConfig.openai?.apiKey) {
-      apiKey = aiConfig.openai.apiKey;
+      selectedModel = cfg.siliconflow.model || 'Qwen/Qwen3-8B';
+    } else if (provider === 'openai' && cfg.openai?.apiKey) {
+      apiKey = cfg.openai.apiKey;
       baseUrl = 'https://api.openai.com/v1';
-      selectedModel = model || aiConfig.openai.model || 'gpt-4o-mini';
-    } else if (sel === 'custom' && aiConfig.custom?.apiKey) {
-      apiKey = aiConfig.custom.apiKey;
-      baseUrl = aiConfig.custom.baseUrl || 'https://api.openai.com/v1';
-      selectedModel = model || aiConfig.custom.model || 'gpt-4o-mini';
-    } else {
-      apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
-      baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-      selectedModel = model || process.env.OPENROUTER_DEFAULT_MODEL || 'openrouter/free';
+      selectedModel = cfg.openai.model || 'gpt-4o-mini';
+    } else if (provider === 'custom' && cfg.custom?.apiKey) {
+      apiKey = cfg.custom.apiKey;
+      baseUrl = cfg.custom.baseUrl || 'https://api.openai.com/v1';
+      selectedModel = cfg.custom.model || 'gpt-4o-mini';
     }
 
     if (!apiKey) {
-      return res.json({
-        success: false,
-        error: '未配置 AI API Key，请先在系统设置中配置'
-      });
+      return res.json({ success: false, error: '未配置 AI API Key，请先在系统设置中配置' });
     }
 
-    // 读取亚马逊广告知识库
-    let systemPrompt = `你是一个专业的亚马逊广告运营专家助手，专门帮助用户分析广告数据、提供优化建议。请基于以下知识库回答用户问题：
+    // ── 调用 AI ──
+    const systemPrompt = `你是一个专业的亚马逊广告运营专家助手，专门帮助用户分析广告数据、提供优化建议。回答要简洁专业，直接给出分析和建议。`;
+    const aiResult = await aiService.chat({ apiKey, baseUrl, model: selectedModel, userMessage: query, systemPrompt });
 
-重要：你还可以根据用户需求自动创建任务。如果用户请求：
-- 分析广告表现
-- 优化广告活动
-- 生成报告
-- 执行一系列操作
-- 任何需要多个步骤完成的工作
-
-你可以在回复末尾添加一行特殊标记来自动创建任务：
-【创建任务:任务名称|任务描述】
-
-例如：
-"根据以上分析，我建议执行以下优化操作..."
-【创建任务:优化低ACOS广告活动|降低出价、优化关键词】`;
-
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const knowledgePath = path.join(__dirname, '../knowledge/amazon-ppc-knowledge.md');
-      if (fs.existsSync(knowledgePath)) {
-        const knowledge = fs.readFileSync(knowledgePath, 'utf-8');
-        systemPrompt += '\n\n' + knowledge;
-      }
-    } catch (e) {
-      console.log('读取知识库失败:', e.message);
-    }
-
-    // 调用 AI（使用用户的实际查询，加上系统提示）
-    console.log('准备调用 AI，模型:', selectedModel);
-    const aiResult = await aiService.chat({
-      apiKey,
-      baseUrl,
-      model: selectedModel,
-      userMessage: query,
-      systemPrompt
-    });
-    
     if (!aiResult.success) {
-      console.log('AI 调用失败，错误信息:', aiResult.error);
       return res.json({ success: false, error: aiResult.error });
     }
 
-    // 检查是否需要创建任务
+    // ── 检测并创建任务标记 ──
     let taskId = null;
-    let cleanResponse = aiResult.response;
-    
-    // 检测任务创建标记
-    const taskMatch = aiResult.response.match(/【创建任务:([^|]+)\|([^\]】]+)】/);
+    let cleanResponse = aiResult.response || '';
+    const taskMatch = cleanResponse.match(/【创建任务:([^|]+)\|([^\]】]+)】/);
     if (taskMatch) {
       const taskName = taskMatch[1].trim();
       const taskDescription = taskMatch[2].trim();
-      
-      console.log('检测到需要创建任务:', taskName);
-      
-      // 生成任务ID
       taskId = 'T' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
-      
       try {
-        // 创建任务
-        db.run(`
-          INSERT INTO ai_tasks (id, name, description, priority, status, source, creator_name, total_items, completed_items, created_at)
-          VALUES (?, ?, ?, 'medium', 'pending', 'ai_command', 'AI助手', 0, 0, datetime('now'))
-        `, [taskId, taskName, taskDescription]);
-        
-        // 清理响应中的任务标记
-        cleanResponse = aiResult.response.replace(/【创建任务:[^|]+\|[^\]】]+】/g, '').trim();
-        
-        console.log('任务创建成功，ID:', taskId);
-      } catch (e) {
-        console.log('创建任务失败:', e.message);
-        taskId = null;
-      }
+        db.run(`INSERT INTO ai_tasks (id, name, description, priority, status, source, creator_name, total_items, completed_items, created_at)
+                VALUES (?, ?, ?, 'medium', 'pending', 'ai_command', 'AI助手', 0, 0, datetime('now'))`,
+          [taskId, taskName, taskDescription]);
+        cleanResponse = cleanResponse.replace(/【创建任务:[^|]+\|[^\]】]+】/g, '').trim();
+      } catch (e) { taskId = null; }
     }
 
-    // 记录操作日志
-    addOperationLog(
-      'AI助手',
-      'AI查询',
-      selectedModel,
-      `用户发起AI查询，使用模型: ${selectedModel}`,
-      JSON.stringify({ query: query.substring(0, 100), taskCreated: !!taskId })
-    );
-
-    const responseData = {
-      success: true,
-      response: cleanResponse
-    };
-    
-    if (taskId) {
-      responseData.taskId = taskId;
-    }
-
+    const responseData = { success: true, response: cleanResponse };
+    if (taskId) responseData.taskId = taskId;
     res.json(responseData);
 
   } catch (error) {
-    console.log('AI 查询错误:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

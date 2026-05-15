@@ -10,6 +10,7 @@ const path = require('path');
 
 // 导入数据库
 const db = require('./config/database');
+const syncScheduler = require('./services/sync-scheduler');
 
 // 导入路由
 const apiRoutes = require('./routes/api');
@@ -34,6 +35,38 @@ app.use(express.static(path.join(__dirname, '../public')));
 // 任务路由
 const taskRoutes = require('./routes/tasks');
 app.use('/api/tasks', taskRoutes);
+
+// AI 对话历史兼容路由（前端直接调用 /api/history）
+app.get('/api/history', (req, res) => {
+  const { limit = 20, page = 1 } = req.query;
+  const offset = (page - 1) * limit;
+
+  try {
+    const conversations = db.query(`
+      SELECT * FROM ai_conversations
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `, [Number(limit), Number(offset)]);
+
+    const totalResult = db.query('SELECT COUNT(*) as count FROM ai_conversations');
+    const total = totalResult?.[0]?.count || 0;
+
+    res.json({ success: true, conversations, total, page: Number(page), limit: Number(limit) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 获取单条对话详情
+app.get('/api/history/:id', (req, res) => {
+  try {
+    const conv = db.get('SELECT * FROM ai_conversations WHERE id = ?', [req.params.id]);
+    if (!conv) return res.status(404).json({ success: false, message: '对话不存在' });
+    res.json({ success: true, conversation: conv });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // API路由
 app.use('/api/config', configRoutes);
@@ -68,6 +101,10 @@ async function startServer() {
     // 等待数据库初始化
     await db.ready();
     console.log('✅ 数据库就绪');
+
+    // 初始化自动数据同步调度器
+    syncScheduler.init();
+    console.log('✅ 同步调度器初始化完成');
     
     app.listen(PORT, () => {
       console.log(`

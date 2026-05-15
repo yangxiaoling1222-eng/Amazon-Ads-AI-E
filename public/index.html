@@ -901,15 +901,15 @@
         <div class="suggestions-header">
           <h3>优化建议</h3>
           <div class="filter-tabs">
-            <button class="filter-tab active">全部</button>
-            <button class="filter-tab">高优先级</button>
-            <button class="filter-tab">出价调整</button>
-            <button class="filter-tab">否定词</button>
+            <button class="filter-tab active" onclick="filterSuggestions('all', this)">全部</button>
+            <button class="filter-tab" onclick="filterSuggestions('high', this)">高优先级</button>
+            <button class="filter-tab" onclick="filterSuggestions('bid', this)">出价调整</button>
+            <button class="filter-tab" onclick="filterSuggestions('negative', this)">否定词</button>
           </div>
         </div>
 
         <div class="suggestion-list" id="suggestionList">
-          <div class="suggestion-item">
+          <div class="suggestion-item" data-type="BID_DECREASE" data-priority="high">
             <div class="suggestion-priority high"></div>
             <div class="suggestion-content">
               <div class="suggestion-type">降低出价</div>
@@ -922,7 +922,7 @@
             </div>
           </div>
           
-          <div class="suggestion-item">
+          <div class="suggestion-item" data-type="PAUSE_CAMPAIGN" data-priority="high">
             <div class="suggestion-priority high"></div>
             <div class="suggestion-content">
               <div class="suggestion-type">暂停活动</div>
@@ -935,7 +935,7 @@
             </div>
           </div>
 
-          <div class="suggestion-item">
+          <div class="suggestion-item" data-type="ADD_NEGATIVE" data-priority="medium">
             <div class="suggestion-priority medium"></div>
             <div class="suggestion-content">
               <div class="suggestion-type">添加否定词</div>
@@ -948,7 +948,7 @@
             </div>
           </div>
 
-          <div class="suggestion-item">
+          <div class="suggestion-item" data-type="BID_INCREASE" data-priority="low">
             <div class="suggestion-priority low"></div>
             <div class="suggestion-content">
               <div class="suggestion-type">提高出价</div>
@@ -987,23 +987,23 @@
       'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3'
     };
 
-    // 加载 AI 配置并更新模型名称
+    // 加载 AI 配置并更新模型名称（复用 agent/config 统一接口）
     async function loadAIConfig() {
       try {
-        const res = await fetch(`${API_BASE}/config`);
+        const res = await fetch(`${API_BASE}/agent/config`);
         const data = await res.json();
         
-        if (data.success && data.data) {
-          // 优先使用 OpenRouter 模型配置，其次使用 OpenAI 模型
-          let modelId = data.data['openrouter-model'] || data.data['openai-model'] || DEFAULT_MODEL;
+        if (data.success && data.data?.configured) {
+          const provider = data.data.provider || 'AI';
+          const model = data.data.model || '';
+          const modelName = model.split('/').pop() || provider;
+          const providerLabel = provider === 'openrouter' ? 'OpenRouter' :
+                                provider === 'siliconflow' ? 'SiliconFlow' :
+                                provider === 'openai' ? 'OpenAI' : provider;
           
-          // 获取友好的模型名称
-          const modelName = MODEL_NAMES[modelId] || modelId.split('/').pop() || 'AI';
-          
-          // 更新标签
           const badge = document.querySelector('.ai-badge');
           if (badge) {
-            badge.textContent = `Powered by ${modelName}`;
+            badge.textContent = `Powered by ${providerLabel} (自动选择)`;
           }
         }
       } catch (error) {
@@ -1406,8 +1406,9 @@
 
     // 渲染优化建议
     function renderSuggestions(suggestions) {
-      // 保存到全局变量供详情功能使用
+      // 保存到全局变量供筛选和详情功能使用
       window._currentSuggestions = suggestions;
+      window._allSuggestions = suggestions;
       
       const container = document.getElementById('suggestionList');
       
@@ -1447,6 +1448,65 @@
           </div>
         </div>
       `).join('');
+    }
+
+    // 筛选优化建议
+    function filterSuggestions(type, btn) {
+      // 切换按钮高亮
+      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const allSuggestions = window._allSuggestions || window._currentSuggestions;
+
+      // 如果是后端数据渲染的，按类型筛选后重新渲染
+      if (allSuggestions && allSuggestions.length > 0) {
+        let filtered = allSuggestions;
+        if (type === 'high') {
+          filtered = allSuggestions.filter(s => s.priority === 'high');
+        } else if (type === 'bid') {
+          filtered = allSuggestions.filter(s => s.type === 'BID_DECREASE' || s.type === 'BID_INCREASE');
+        } else if (type === 'negative') {
+          filtered = allSuggestions.filter(s => s.type === 'ADD_NEGATIVE');
+        }
+        // 临时覆盖 _currentSuggestions 以便 renderSuggestions 渲染
+        window._currentSuggestions = filtered;
+        const container = document.getElementById('suggestionList');
+        if (!filtered || filtered.length === 0) {
+          container.innerHTML = '<div class="no-data" style="padding:24px;text-align:center;color:var(--text-secondary);">该分类暂无建议</div>';
+          return;
+        }
+        // 复用 renderSuggestions 内的渲染逻辑（不更新 _allSuggestions）
+        const typeLabels = { 'BID_DECREASE':'降低出价','BID_INCREASE':'提高出价','PAUSE_CAMPAIGN':'暂停活动','ADD_NEGATIVE':'添加否定词','BUDGET_INCREASE':'增加预算','BUDGET_DECREASE':'降低预算' };
+        container.innerHTML = filtered.slice(0, 10).map(s => `
+          <div class="suggestion-item" data-id="${s.id || s.campaignId || ''}" data-type="${s.type}" data-priority="${s.priority}">
+            <div class="suggestion-priority ${s.priority || 'medium'}"></div>
+            <div class="suggestion-content">
+              <div class="suggestion-type">${typeLabels[s.type] || s.type}</div>
+              <div class="suggestion-title">${s.campaignName || s.title || '未知活动'}</div>
+              <div class="suggestion-reason">${s.reason || s.description || ''}</div>
+              <div class="suggestion-actions">
+                <button class="btn btn-primary" onclick="executeSuggestion('${s.type}', '${s.id || s.campaignId || ''}')">
+                  ${s.type === 'PAUSE_CAMPAIGN' ? '暂停活动' : s.type === 'ADD_NEGATIVE' ? '添加否定词' : '执行建议'}
+                </button>
+                <button class="btn btn-secondary" onclick="viewSuggestionDetail('${s.id || s.campaignId || ''}')">查看详情</button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+        return;
+      }
+
+      // 后端没有数据时，对静态 HTML 建议做 DOM 筛选（根据 data-type / data-priority 属性）
+      const items = document.querySelectorAll('#suggestionList .suggestion-item');
+      items.forEach(item => {
+        const itemType = item.dataset.type || '';
+        const itemPriority = item.dataset.priority || item.querySelector('.suggestion-priority')?.className.replace('suggestion-priority','').trim() || '';
+        let show = true;
+        if (type === 'high') show = itemPriority === 'high';
+        else if (type === 'bid') show = itemType === 'BID_DECREASE' || itemType === 'BID_INCREASE';
+        else if (type === 'negative') show = itemType === 'ADD_NEGATIVE';
+        item.style.display = show ? '' : 'none';
+      });
     }
     
     // 执行优化建议

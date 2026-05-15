@@ -6,6 +6,7 @@
   <title>AI自动优化 - 亚马逊广告AI专家</title>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js"></script>
   <style>
     :root {
       --primary: #667eea;
@@ -889,6 +890,28 @@
     .chat-bubble.user { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
     .chat-bubble.ai { align-self: flex-start; background: var(--bg-input); border-bottom-left-radius: 4px; }
     .chat-bubble.system { align-self: center; background: rgba(102,126,234,.08); color: var(--text-secondary); font-size: 12px; padding: 6px 14px; border-radius: 20px; max-width: 60%; text-align: center; }
+
+    /* ── Markdown 渲染样式 ── */
+    .chat-bubble.ai .md-content { color: var(--text-primary); }
+    .chat-bubble.ai .md-content h1 { font-size: 18px; font-weight: 700; margin: 16px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .chat-bubble.ai .md-content h2 { font-size: 16px; font-weight: 700; margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .chat-bubble.ai .md-content h3 { font-size: 15px; font-weight: 600; margin: 12px 0 6px; color: var(--text-primary); }
+    .chat-bubble.ai .md-content h4 { font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
+    .chat-bubble.ai .md-content p { margin: 8px 0; }
+    .chat-bubble.ai .md-content ul, .chat-bubble.ai .md-content ol { margin: 8px 0; padding-left: 20px; }
+    .chat-bubble.ai .md-content li { margin: 4px 0; }
+    .chat-bubble.ai .md-content table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+    .chat-bubble.ai .md-content th, .chat-bubble.ai .md-content td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+    .chat-bubble.ai .md-content th { background: rgba(102,126,234,.06); font-weight: 600; }
+    .chat-bubble.ai .md-content tr:nth-child(even) { background: rgba(0,0,0,.02); }
+    .chat-bubble.ai .md-content code { background: rgba(0,0,0,.06); padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+    .chat-bubble.ai .md-content pre { background: #1e1e2e; color: #cdd6f4; padding: 14px; border-radius: 10px; overflow-x: auto; margin: 10px 0; font-size: 12px; line-height: 1.5; }
+    .chat-bubble.ai .md-content pre code { background: transparent; padding: 0; color: inherit; }
+    .chat-bubble.ai .md-content blockquote { border-left: 3px solid var(--primary); margin: 10px 0; padding: 6px 14px; background: rgba(102,126,234,.04); border-radius: 0 8px 8px 0; color: var(--text-secondary); }
+    .chat-bubble.ai .md-content hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+    .chat-bubble.ai .md-content strong { font-weight: 600; color: var(--text-primary); }
+    .chat-bubble.ai .md-content a { color: var(--primary); text-decoration: none; }
+    .chat-bubble.ai .md-content a:hover { text-decoration: underline; }
     .chat-tool-card { align-self: flex-start; max-width: 90%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 12px; margin-bottom: 4px; }
     .chat-tool-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; color: var(--primary); }
     .chat-tool-status { margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
@@ -929,6 +952,9 @@
     .chat-ex-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; cursor: pointer; text-align: left; transition: all .15s; display: flex; align-items: center; gap: 8px; }
     .chat-ex-card:hover { border-color: var(--primary); background: rgba(102,126,234,.05); }
     .chat-ex-card span:first-child { font-size: 15px; flex-shrink: 0; }
+    .listing-analysis-card { border-left: 3px solid #10b981 !important; }
+    .listing-analysis-card:hover { border-color: #10b981 !important; background: rgba(16,185,129,.08) !important; }
+    .listing-analysis-card span:last-child { color: #10b981 !important; font-weight: 600 !important; }
     .chat-panel-right { width: 280px; border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
     .chat-panel-section { padding: 14px; border-bottom: 1px solid var(--border); }
     .chat-panel-section-title { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
@@ -1913,7 +1939,7 @@
             currentAcos: t.current_acos,
             tolerance: t.tolerance,
             status: t.status,
-            autoActions: t.autoActions || (t.auto_actions ? JSON.parse(t.auto_actions) : []),
+            autoActions: Array.isArray(t.autoActions) ? t.autoActions : (t.auto_actions ? (() => { try { return JSON.parse(t.auto_actions); } catch(e) { return []; } })() : []),
             createdAt: t.created_at,
             dailyBudget: t.daily_budget,
             maxBidChange: t.max_bid_change,
@@ -2060,7 +2086,8 @@
       tbody.innerHTML = targets.map(t => {
         const acosStatus = getAcosStatus(t.currentAcos, t.targetAcos, t.tolerance);
         const statusBadge = getStatusBadge(t.status);
-        const actionsList = t.autoActions.map(a => getActionName(a)).join(', ');
+        const actionsArr = Array.isArray(t.autoActions) ? t.autoActions : (typeof t.autoActions === 'string' ? t.autoActions.split(/[\s,]+/).filter(Boolean) : []);
+        const actionsList = actionsArr.map(a => getActionName(a)).join(', ');
         const storeDisplay = t.storeName || getStoreName(t.storeId) || '-';
         const canOperate = canOperateTarget(t);
 
@@ -2857,7 +2884,8 @@
         }
 
         if (data.response) {
-          appendChatBubble('ai', data.response.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/\n/g,'<br>'));
+          const mdHtml = typeof marked !== 'undefined' ? marked.parse(data.response) : data.response.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/\n/g,'<br>');
+          appendChatBubble('ai', '<div class="md-content">' + mdHtml + '</div>');
         } else if (data.error) {
           appendChatBubble('ai', `❌ 出错了：${data.error}`);
         }
@@ -3560,7 +3588,8 @@
               if (m.role === 'user') {
                 return `<div class="chat-bubble user">${escapeHtml(m.content)}</div>`;
               } else {
-                return `<div class="chat-bubble assistant">${escapeHtml(m.content)}</div>`;
+                const mdHtml = typeof marked !== 'undefined' ? marked.parse(m.content || '') : escapeHtml(m.content || '');
+                return `<div class="chat-bubble ai"><div class="md-content">${mdHtml}</div></div>`;
               }
             }).join('');
             scrollChatToBottom();
@@ -3773,7 +3802,793 @@
       document.body.appendChild(t);
       setTimeout(() => { t.style.animation = 'slideIn .3s ease reverse'; setTimeout(() => t.remove(), 300); }, 2500);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Listing 分析器功能
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 打开 Listing 分析器
+    function openListingAnalyzer() {
+      const modal = document.getElementById('listing-analyzer-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        // 清空之前的内容
+        document.getElementById('listing-url-input').value = '';
+        document.getElementById('listing-product-preview').style.display = 'none';
+        document.getElementById('listing-analysis-result').innerHTML = '';
+        document.getElementById('listing-export-section').style.display = 'none';
+        // 切换到链接模式
+        switchListingInputMode('url');
+      }
+    }
+
+    // 关闭 Listing 分析器
+    function closeListingAnalyzer() {
+      const modal = document.getElementById('listing-analyzer-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    // 切换输入模式：url-链接模式 / manual-手动模式
+    function switchListingInputMode(mode) {
+      const urlSection = document.getElementById('listing-url-section');
+      const manualSection = document.getElementById('listing-manual-section');
+      const urlTab = document.getElementById('listing-tab-url');
+      const manualTab = document.getElementById('listing-tab-manual');
+
+      if (mode === 'url') {
+        urlSection.style.display = 'block';
+        manualSection.style.display = 'none';
+        urlTab.classList.add('active');
+        manualTab.classList.remove('active');
+      } else {
+        urlSection.style.display = 'none';
+        manualSection.style.display = 'block';
+        urlTab.classList.remove('active');
+        manualTab.classList.add('active');
+      }
+    }
+
+    // 从链接抓取 Listing 信息
+    async function scrapeAndAnalyze() {
+      const urlInput = document.getElementById('listing-url-input');
+      const url = urlInput.value.trim();
+
+      if (!url) {
+        showToast('请输入亚马逊产品链接', 'warning');
+        return;
+      }
+
+      // 验证链接格式
+      if (!url.includes('amazon.') && !url.match(/^(B[A-Z0-9]{9}|[A-Z0-9]{10})$/i)) {
+        showToast('请输入有效的亚马逊链接或 ASIN', 'warning');
+        return;
+      }
+
+      const resultEl = document.getElementById('listing-analysis-result');
+      const exportSection = document.getElementById('listing-export-section');
+      const previewSection = document.getElementById('listing-product-preview');
+
+      // 显示抓取状态
+      resultEl.innerHTML = `
+        <div style="text-align:center;padding:40px;">
+          <div style="font-size:32px;margin-bottom:16px;">🔍</div>
+          <div style="color:var(--text-secondary);">正在抓取亚马逊页面...</div>
+          <div style="margin-top:12px;font-size:12px;color:#6b7280;">自动提取产品信息</div>
+          <div style="margin-top:12px;">
+            <div class="chat-dot-pulse" style="display:inline-flex;gap:4px;">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      `;
+      exportSection.style.display = 'none';
+      previewSection.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/agent/scrape-amazon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // 显示抓取到的产品信息预览
+          const product = data.product;
+          if (product) {
+            previewSection.innerHTML = `
+              <div style="padding:16px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-radius:12px;border:1px solid #a7f3d0;">
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  <span style="font-size:32px;flex-shrink:0;">🏪</span>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;color:#065f46;font-size:14px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                      ${escapeHtml(product.title || '未知产品')}
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#047857;">
+                      <span>📦 ASIN: ${product.asin || '未知'}</span>
+                      <span>💰 ${product.price || '未知价格'}</span>
+                      <span>⭐ ${product.rating || '无评分'} (${product.reviews || '0'} 条)</span>
+                      <span>🏢 ${product.brand || '未知品牌'}</span>
+                    </div>
+                    ${product.category ? `<div style="margin-top:6px;font-size:11px;color:#059669;">📂 ${escapeHtml(product.category)}</div>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+            previewSection.style.display = 'block';
+          }
+
+          // 显示分析结果
+          let formattedReport = data.report
+            .replace(/^# (.+)$/gm, '<h2 style="margin:20px 0 10px;font-size:18px;color:#059669;">$1</h2>')
+            .replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;font-size:15px;color:#374151;font-weight:600;">$1</h3>')
+            .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;font-size:14px;color:#6b7280;">$1</h4>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#059669;">$1</strong>')
+            .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>')
+            .replace(/\n/g, '<br>');
+
+          resultEl.innerHTML = `
+            <div style="max-height:500px;overflow-y:auto;padding:16px;">
+              ${formattedReport}
+            </div>
+          `;
+
+          // 保存报告用于导出
+          window._lastListingReport = data.report;
+          window._lastListingTitle = product?.title || product?.asin || 'Listing分析';
+
+          exportSection.style.display = 'flex';
+        } else {
+          resultEl.innerHTML = `
+            <div style="text-align:center;padding:40px;color:#ef4444;">
+              <div style="font-size:32px;margin-bottom:16px;">❌</div>
+              <div style="font-weight:500;">抓取失败</div>
+              <div style="margin-top:8px;font-size:13px;color:#6b7280;">${escapeHtml(data.error || '未知错误')}</div>
+              ${data.hint ? `<div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">💡 ${escapeHtml(data.hint)}</div>` : ''}
+              <button onclick="switchListingInputMode('manual')" style="margin-top:16px;padding:10px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;">
+                📝 切换到手动输入模式
+              </button>
+            </div>
+          `;
+        }
+      } catch (e) {
+        resultEl.innerHTML = `
+          <div style="text-align:center;padding:40px;color:#ef4444;">
+            <div style="font-size:32px;margin-bottom:16px;">❌</div>
+            <div>网络错误: ${escapeHtml(e.message)}</div>
+            <button onclick="switchListingInputMode('manual')" style="margin-top:16px;padding:10px 20px;background:#059669;color:white;border:none;border-radius:8px;cursor:pointer;">
+              📝 切换到手动输入模式
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    // 切换分析模式
+    function toggleListingMode(mode) {
+      document.getElementById('listing-mode-simple').classList.toggle('active', mode === 'simple');
+      document.getElementById('listing-mode-detailed').classList.toggle('active', mode === 'detailed');
+      document.getElementById('listing-mode-competitor').classList.toggle('active', mode === 'competitor');
+
+      // 显示/隐藏竞品 ASIN 输入
+      document.getElementById('competitor-asin-group').style.display = mode === 'competitor' ? 'block' : 'none';
+    }
+
+    // 提交 Listing 分析（手动模式）
+    async function submitListingAnalysis() {
+      const asin = document.getElementById('listing-asin').value.trim();
+      const title = document.getElementById('listing-title').value.trim();
+      const bullets = document.getElementById('listing-bullets').value.trim();
+      const description = document.getElementById('listing-description').value.trim();
+      const price = document.getElementById('listing-price').value.trim();
+      const reviews = document.getElementById('listing-reviews').value.trim();
+      const rating = document.getElementById('listing-rating').value.trim();
+      const competitorAsin = document.getElementById('listing-competitor-asin')?.value.trim() || '';
+
+      // 获取当前选中的分析模式
+      const modeEl = document.querySelector('.listing-mode-btn.active');
+      const mode = modeEl ? modeEl.id.replace('listing-mode-', '') : 'simple';
+
+      // 至少需要 ASIN 或标题
+      if (!asin && !title) {
+        showToast('请提供 ASIN 或产品标题', 'warning');
+        return;
+      }
+
+      const resultEl = document.getElementById('listing-analysis-result');
+      const exportSection = document.getElementById('listing-export-section');
+
+      // 显示加载状态
+      resultEl.innerHTML = `
+        <div style="text-align:center;padding:40px;">
+          <div style="font-size:32px;margin-bottom:16px;">🔍</div>
+          <div style="color:var(--text-secondary);">AI 正在分析 Listing，请稍候...</div>
+          <div style="margin-top:12px;">
+            <div class="chat-dot-pulse" style="display:inline-flex;gap:4px;">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      `;
+      exportSection.style.display = 'none';
+
+      // 构建分析信息
+      let listingInfo = '';
+      if (asin) listingInfo += `ASIN: ${asin}\n`;
+      if (title) listingInfo += `产品标题: ${title}\n`;
+      if (bullets) listingInfo += `\n五点描述:\n${bullets}\n`;
+      if (description) listingInfo += `\n产品描述:\n${description}\n`;
+      if (price) listingInfo += `\n价格: ${price}\n`;
+      if (reviews) listingInfo += `评论数: ${reviews}\n`;
+      if (rating) listingInfo += `评分: ${rating}\n`;
+      if (competitorAsin && mode === 'competitor') listingInfo += `\n对比竞品 ASIN: ${competitorAsin}\n`;
+
+      try {
+        const res = await fetch('/api/agent/analyze-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listingInfo,
+            mode
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // 格式化报告
+          let formattedReport = data.report
+            .replace(/^# (.+)$/gm, '<h2 style="margin:20px 0 10px;font-size:18px;color:var(--primary);">$1</h2>')
+            .replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;font-size:15px;color:#374151;font-weight:600;">$1</h3>')
+            .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;font-size:14px;color:#6b7280;">$1</h4>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--primary);">$1</strong>')
+            .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>')
+            .replace(/\n/g, '<br>');
+
+          resultEl.innerHTML = `
+            <div style="max-height:500px;overflow-y:auto;padding:16px;">
+              ${formattedReport}
+            </div>
+          `;
+
+          // 保存报告内容用于导出
+          window._lastListingReport = data.report;
+          window._lastListingTitle = asin || title?.slice(0, 30) || 'Listing分析';
+
+          // 显示导出按钮
+          exportSection.style.display = 'flex';
+        } else {
+          resultEl.innerHTML = `
+            <div style="text-align:center;padding:40px;color:#ef4444;">
+              <div style="font-size:32px;margin-bottom:16px;">❌</div>
+              <div>分析失败: ${data.error}</div>
+              <div style="margin-top:8px;font-size:12px;color:#6b7280;">
+                请检查 AI 配置是否正确（系统设置 → AI优化）
+              </div>
+            </div>
+          `;
+        }
+      } catch (e) {
+        resultEl.innerHTML = `
+          <div style="text-align:center;padding:40px;color:#ef4444;">
+            <div style="font-size:32px;margin-bottom:16px;">❌</div>
+            <div>网络错误: ${e.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    // 导出分析报告
+    async function exportListingReport(format) {
+      const report = window._lastListingReport;
+      const title = window._lastListingTitle || 'Listing分析';
+
+      if (!report) {
+        showToast('没有可导出的报告', 'warning');
+        return;
+      }
+
+      try {
+        if (format === 'chat') {
+          // 复制到剪贴板
+          await navigator.clipboard.writeText(report);
+          showToast('报告已复制到剪贴板', 'success');
+          return;
+        }
+
+        showToast('正在生成文档...', 'info');
+
+        const res = await fetch('/api/agent/export-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            report,
+            title: title,
+            metadata: {
+              exportedAt: new Date().toISOString(),
+              source: 'WorkBuddy Listing Analyzer'
+            }
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // 触发下载
+          const link = document.createElement('a');
+          link.href = data.downloadUrl;
+          link.download = data.filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showToast('文档下载成功', 'success');
+        } else {
+          // 如果 Word 生成失败，提供 Markdown 下载
+          if (data.error?.includes('pandoc') || data.error?.includes('docx')) {
+            showToast('Word 生成失败，已复制报告内容到剪贴板', 'warning');
+            await navigator.clipboard.writeText(report);
+          } else {
+            showToast('导出失败: ' + (data.error || '未知错误'), 'error');
+          }
+        }
+      } catch (e) {
+        showToast('导出失败: ' + e.message, 'error');
+      }
+    }
+
+    // 点击模态框外部关闭
+    document.addEventListener('click', function(e) {
+      const modal = document.getElementById('listing-analyzer-modal');
+      if (modal && e.target === modal) {
+        closeListingAnalyzer();
+      }
+    });
   </script>
+
+  <!-- Listing 分析器模态框 -->
+  <div id="listing-analyzer-modal" class="listing-analyzer-modal">
+    <div class="listing-analyzer-content">
+      <div class="listing-analyzer-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:24px;">🏪</span>
+          <div>
+            <h3 style="margin:0;font-size:16px;">Listing 分析器</h3>
+            <p style="margin:4px 0 0;font-size:12px;opacity:0.9;">AI 亚马逊高级运营经理角色</p>
+          </div>
+        </div>
+        <button class="listing-analyzer-close" onclick="closeListingAnalyzer()">×</button>
+      </div>
+
+      <div class="listing-analyzer-body">
+        <!-- 输入模式切换：链接 / 手动 -->
+        <div class="listing-input-tabs">
+          <button class="listing-input-tab active" id="listing-tab-url" onclick="switchListingInputMode('url')">
+            🔗 链接分析
+          </button>
+          <button class="listing-input-tab" id="listing-tab-manual" onclick="switchListingInputMode('manual')">
+            📝 手动输入
+          </button>
+        </div>
+
+        <!-- 链接输入模式（默认） -->
+        <div id="listing-url-section">
+          <div class="listing-url-box">
+            <div class="listing-url-icon">🛒</div>
+            <input type="text" id="listing-url-input" class="listing-url-input"
+              placeholder="粘贴亚马逊产品链接，例如：https://www.amazon.com/dp/B0F6NDWSSV"
+              onkeypress="if(event.key==='Enter') scrapeAndAnalyze()">
+            <button class="listing-url-btn" onclick="scrapeAndAnalyze()">
+              🚀 一键分析
+            </button>
+          </div>
+          <div class="listing-url-hint">
+            💡 支持亚马逊全球站点，自动提取产品信息并深度分析
+          </div>
+        </div>
+
+        <!-- 手动输入模式（默认隐藏） -->
+        <div id="listing-manual-section" style="display:none;">
+          <!-- 分析模式选择 -->
+          <div class="listing-mode-selector">
+            <button class="listing-mode-btn active" id="listing-mode-simple" onclick="toggleListingMode('simple')">
+              ⚡ 快速分析
+            </button>
+            <button class="listing-mode-btn" id="listing-mode-detailed" onclick="toggleListingMode('detailed')">
+              📋 详细分析
+            </button>
+            <button class="listing-mode-btn" id="listing-mode-competitor" onclick="toggleListingMode('competitor')">
+              ⚔️ 竞品对比
+            </button>
+          </div>
+
+          <!-- 基本信息 -->
+          <div class="listing-form-group">
+            <label class="listing-form-label">ASIN（选填）</label>
+            <input type="text" id="listing-asin" class="listing-form-input" placeholder="例如: B08N5WRWNW">
+          </div>
+
+          <div class="listing-form-group">
+            <label class="listing-form-label">产品标题</label>
+            <input type="text" id="listing-title" class="listing-form-input" placeholder="粘贴你的产品标题">
+          </div>
+
+          <!-- 五点描述 -->
+          <div class="listing-form-group">
+            <label class="listing-form-label">五点描述（Bullet Points）</label>
+            <textarea id="listing-bullets" class="listing-form-textarea" rows="5" placeholder="粘贴你的五点描述，每条一行"></textarea>
+          </div>
+
+          <!-- 产品描述 -->
+          <div class="listing-form-group">
+            <label class="listing-form-label">产品描述</label>
+            <textarea id="listing-description" class="listing-form-textarea" rows="4" placeholder="粘贴你的产品描述"></textarea>
+          </div>
+
+          <!-- 基本数据 -->
+          <div class="listing-form-row">
+            <div class="listing-form-group">
+              <label class="listing-form-label">价格 ($)</label>
+              <input type="text" id="listing-price" class="listing-form-input" placeholder="例如: 29.99">
+            </div>
+            <div class="listing-form-group">
+              <label class="listing-form-label">评论数</label>
+              <input type="text" id="listing-reviews" class="listing-form-input" placeholder="例如: 1500">
+            </div>
+            <div class="listing-form-group">
+              <label class="listing-form-label">评分</label>
+              <input type="text" id="listing-rating" class="listing-form-input" placeholder="例如: 4.3">
+            </div>
+          </div>
+
+          <!-- 竞品 ASIN（仅竞品对比模式显示） -->
+          <div class="listing-form-group" id="competitor-asin-group" style="display:none;">
+            <label class="listing-form-label">📌 对比竞品 ASIN</label>
+            <input type="text" id="listing-competitor-asin" class="listing-form-input" placeholder="输入要对比的竞品 ASIN">
+          </div>
+
+          <!-- 提交按钮 -->
+          <button class="listing-submit-btn" onclick="submitListingAnalysis()">
+            🔍 开始分析
+          </button>
+        </div>
+
+        <!-- 产品信息预览（抓取成功后显示） -->
+        <div id="listing-product-preview" class="listing-product-preview" style="display:none;"></div>
+
+        <!-- 分析结果 -->
+        <div id="listing-analysis-result" class="listing-result"></div>
+
+        <!-- 导出选项 -->
+        <div id="listing-export-section" class="listing-export-section" style="display:none;">
+          <div class="listing-export-title">📥 导出报告</div>
+          <div class="listing-export-buttons">
+            <button class="listing-export-btn" onclick="exportListingReport('word')">
+              📄 Word文档
+            </button>
+            <button class="listing-export-btn" onclick="exportListingReport('pdf')">
+              📑 PDF文档
+            </button>
+            <button class="listing-export-btn" onclick="exportListingReport('chat')">
+              📋 复制文本
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Listing 分析器模态框样式 */
+    .listing-analyzer-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .listing-analyzer-content {
+      background: white;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .listing-analyzer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid #e5e7eb;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+    }
+
+    .listing-analyzer-close {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      font-size: 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .listing-analyzer-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .listing-analyzer-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .listing-mode-selector {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .listing-mode-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: 2px solid #e5e7eb;
+      background: white;
+      color: #6b7280;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .listing-mode-btn:hover {
+      border-color: #10b981;
+      color: #10b981;
+    }
+
+    .listing-mode-btn.active {
+      border-color: #10b981;
+      background: #10b981;
+      color: white;
+    }
+
+    .listing-form-group {
+      margin-bottom: 16px;
+    }
+
+    .listing-form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    .listing-form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+
+    .listing-form-input:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .listing-form-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      resize: vertical;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    .listing-form-textarea:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .listing-form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .listing-form-row .listing-form-group {
+      flex: 1;
+    }
+
+    .listing-submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+
+    .listing-submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .listing-result {
+      margin-top: 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #f9fafb;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* 链接输入模式样式 */
+    .listing-input-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      background: #f3f4f6;
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .listing-input-tab {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: transparent;
+      color: #6b7280;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .listing-input-tab:hover {
+      color: #374151;
+    }
+
+    .listing-input-tab.active {
+      background: white;
+      color: #059669;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .listing-url-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+      border: 2px dashed #a7f3d0;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .listing-url-icon {
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .listing-url-input {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      transition: all 0.2s;
+    }
+
+    .listing-url-input:focus {
+      outline: none;
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .listing-url-btn {
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .listing-url-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .listing-url-hint {
+      font-size: 12px;
+      color: #6b7280;
+      text-align: center;
+    }
+
+    .listing-product-preview {
+      margin: 16px 0;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .listing-export-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .listing-export-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 12px;
+    }
+
+    .listing-export-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .listing-export-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid #d1d5db;
+      background: white;
+      color: #374151;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .listing-export-btn:hover {
+      border-color: #10b981;
+      color: #10b981;
+      background: #f0fdf4;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+
   <script src="components/sidebar.js"></script>
 </body>
 </html>

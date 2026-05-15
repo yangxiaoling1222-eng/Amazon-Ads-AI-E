@@ -389,6 +389,20 @@ function createTables() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 产品背景记忆（让 AI 跨会话记住产品信息）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS product_context (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id TEXT,
+      category TEXT DEFAULT 'general',
+      content TEXT NOT NULL,
+      version INTEGER DEFAULT 1,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
   
   console.log('✅ 数据库表创建完成');
 }
@@ -397,6 +411,15 @@ function createTables() {
  * 插入初始数据（如果表为空）
  */
 function insertInitialData() {
+  // 检查产品背景表是否为空，如果为空插入示例
+  const contextCount = query('SELECT COUNT(*) as c FROM product_context');
+  if (!contextCount || contextCount.length === 0 || contextCount[0].c === 0) {
+    console.log('📦 插入示例产品背景数据...');
+    run(`INSERT INTO product_context (category, content) VALUES (?, ?)`,
+      ['general', '我是亚马逊广告运营者，经营多个品类的产品。需要在广告优化时考虑产品特性、竞争环境和利润目标。请在分析时结合这些背景给出实用建议。']);
+    console.log('✅ 产品背景示例数据插入完成');
+  }
+
   // 检查用户表是否为空
   const userCount = query('SELECT COUNT(*) as c FROM users');
   

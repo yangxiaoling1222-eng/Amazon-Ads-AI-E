@@ -510,6 +510,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.72 1.21L11 13V8h1.5z"/></svg>
             AI优化
           </button>
+          <button class="tab-btn" onclick="switchTab('memory')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            产品记忆
+          </button>
           <button class="tab-btn" onclick="switchTab('acos')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
             ACOS目标
@@ -969,20 +973,47 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
               执行频率设置
             </div>
+
+            <!-- 同步状态卡片 -->
+            <div style="margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="font-size: 20px;">🔄</div>
+                <div>
+                  <div style="font-size: 14px; font-weight: 600;">自动数据同步</div>
+                  <div id="sync-status-text" style="font-size: 12px; opacity: 0.9; margin-top: 2px;">加载中...</div>
+                </div>
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                  <button class="btn" onclick="triggerSyncNow()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 14px; font-size: 12px; cursor: pointer; border-radius: 6px;">
+                    立即同步
+                  </button>
+                </div>
+              </div>
+              <div style="font-size: 12px; opacity: 0.8;">
+                下次执行：<span id="sync-next-run">--</span>
+                &nbsp;|&nbsp;
+                最近执行：<span id="sync-last-run">--</span>
+              </div>
+            </div>
+
             <div class="settings-section">
               <div class="section-body">
                 <div class="setting-item">
                   <div class="setting-info">
                     <div class="setting-label">数据同步频率</div>
-                    <div class="setting-desc">从领星ERP同步广告数据的间隔</div>
+                    <div class="setting-desc">从领星ERP自动同步广告数据的间隔</div>
                   </div>
-                  <div class="setting-control">
-                    <select class="select" id="syncInterval">
+                  <div class="setting-control" style="display: flex; gap: 8px; align-items: center;">
+                    <select class="select" id="syncInterval" onchange="saveSyncSchedule()">
+                      <option value="0">手动（关闭自动同步）</option>
                       <option value="15">每15分钟</option>
                       <option value="30">每30分钟</option>
                       <option value="60" selected>每1小时</option>
                       <option value="120">每2小时</option>
+                      <option value="360">每6小时</option>
+                      <option value="720">每12小时</option>
+                      <option value="1440">每天</option>
                     </select>
+                    <span id="sync-save-msg" style="font-size: 12px; color: #10b981; display: none;">✅ 已保存</span>
                   </div>
                 </div>
                 <div class="setting-item">
@@ -1000,6 +1031,37 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- 产品记忆面板 -->
+          <div class="tab-panel" id="panel-memory">
+            <div class="panel-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              🧠 产品记忆配置
+            </div>
+            <div class="settings-section">
+              <div style="margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, rgba(102,126,234,0.08) 0%, rgba(118,75,162,0.08) 100%); border-radius: 12px; border: 1px solid rgba(102,126,234,0.2);">
+                <div style="font-size: 14px; font-weight: 600; color: #667eea; margin-bottom: 8px;">💡 什么是产品记忆？</div>
+                <div style="font-size: 13px; color: #6b7280; line-height: 1.6;">
+                  产品记忆让 AI <strong>跨会话记住</strong>你的产品信息。每次对话时，AI 会自动参考这些背景知识，给出更精准的广告优化建议。例如：产品品类、目标用户、竞争环境、利润目标等。
+                </div>
+              </div>
+              
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label">📝 产品背景描述</label>
+                <textarea id="product-memory-content" class="input" rows="6" placeholder="请描述你的产品信息，例如：&#10;&#10;• 产品品类：厨房用品，主要销售不锈钢水杯&#10;• 目标用户：25-45岁家庭用户，注重品质和性价比&#10;• 竞争环境：品类竞争激烈，需要精细化运营&#10;• 利润目标：ACOS 控制在 15-25% 之间&#10;• 特殊需求：旺季前需要冲排名，淡季需要降低花费"></textarea>
+              </div>
+              
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-primary" onclick="saveProductMemory()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+                  保存产品记忆
+                </button>
+                <div id="memory-save-status" style="font-size: 13px; color: #10b981; display: none;">✅ 已保存</div>
+              </div>
+              
+              <div id="memory-list" style="margin-top: 24px;"></div>
             </div>
           </div>
           
@@ -1112,6 +1174,11 @@
         panel.classList.remove('active');
       });
       document.getElementById('panel-' + tabName).classList.add('active');
+
+      // 切换到产品记忆 Tab 时自动加载
+      if (tabName === 'memory') {
+        loadProductMemory();
+      }
     }
     
     // 管理员权限检查
@@ -1139,6 +1206,7 @@
       checkApiStatus();
       loadSavedConfig();
       initDataSourceSelection();
+      loadSyncSchedule();
     });
     
     // 初始化数据源选择
@@ -1243,6 +1311,112 @@
       localStorage.setItem('apiConfig', JSON.stringify(config));
     }
     
+    // ─────────────────────────────────────────────────────────
+    // 数据自动同步调度
+    // ─────────────────────────────────────────────────────────
+
+    async function loadSyncSchedule() {
+      try {
+        const res = await fetch('/api/scheduler/sync');
+        const json = await res.json();
+        if (!json.success) return;
+
+        const { status, config } = json;
+        const select = document.getElementById('syncInterval');
+        if (!select) return;
+
+        // 设置下拉框值
+        if (config) {
+          select.value = String(config.minutes || 60);
+        }
+
+        // 更新状态卡片
+        const statusText = document.getElementById('sync-status-text');
+        const nextRunEl = document.getElementById('sync-next-run');
+        const lastRunEl = document.getElementById('sync-last-run');
+
+        if (statusText) {
+          if (status.enabled) {
+            statusText.textContent = '已启用 · 每 ' + formatMinutes(status.intervalMs) + ' 执行一次';
+            statusText.parentElement.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+          } else {
+            statusText.textContent = '已关闭（手动模式）';
+            statusText.parentElement.parentElement.style.background = 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+          }
+        }
+
+        if (nextRunEl) {
+          nextRunEl.textContent = status.nextRun ? formatTime(status.nextRun) : '--';
+        }
+        if (lastRunEl) {
+          lastRunEl.textContent = status.lastRun ? formatTime(status.lastRun) : '尚未执行';
+        }
+      } catch (e) {
+        console.warn('加载同步状态失败:', e.message);
+      }
+    }
+
+    async function saveSyncSchedule() {
+      const select = document.getElementById('syncInterval');
+      if (!select) return;
+      const intervalMinutes = parseInt(select.value) || 60;
+
+      try {
+        const res = await fetch('/api/scheduler/sync', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ intervalMinutes, enabled: intervalMinutes > 0 })
+        });
+        const json = await res.json();
+        if (json.success) {
+          const msg = document.getElementById('sync-save-msg');
+          if (msg) {
+            msg.textContent = intervalMinutes > 0 ? '✅ 已保存，定时同步已' + (intervalMinutes > 0 ? '启动' : '停止') : '✅ 已保存，自动同步已关闭';
+            msg.style.display = 'inline';
+            setTimeout(() => msg.style.display = 'none', 3000);
+          }
+          // 更新状态
+          loadSyncSchedule();
+        }
+      } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+      }
+    }
+
+    async function triggerSyncNow() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '同步中...';
+      try {
+        const res = await fetch('/api/scheduler/sync/trigger', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('同步任务已触发，请查看控制台日志', 'success');
+        } else {
+          showToast('同步失败: ' + (json.message || json.error), 'error');
+        }
+      } catch (e) {
+        showToast('同步失败: ' + e.message, 'error');
+      }
+      setTimeout(() => { btn.disabled = false; btn.textContent = '立即同步'; }, 3000);
+    }
+
+    function formatMinutes(ms) {
+      if (!ms) return '--';
+      const m = Math.round(ms / 60000);
+      if (m >= 1440) return (m / 1440).toFixed(0) + ' 天';
+      if (m >= 60) return (m / 60).toFixed(0) + ' 小时';
+      return m + ' 分钟';
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '--';
+      try {
+        const d = new Date(iso);
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      } catch (e) { return iso; }
+    }
+
     async function checkApiStatus() {
       try {
         const response = await fetch('/api/config/status');
@@ -1778,6 +1952,102 @@
       } catch (e) {
         showToast('保存失败: ' + e.message, 'error');
       }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 产品记忆功能（跨会话记住产品信息）
+    // ─────────────────────────────────────────────────────────
+    async function loadProductMemory() {
+      try {
+        const res = await fetch('/api/agent/product-context');
+        const json = await res.json();
+        const listEl = document.getElementById('memory-list');
+        const textareaEl = document.getElementById('product-memory-content');
+
+        if (json.success && json.data && json.data.length > 0) {
+          // 显示已有的记忆列表
+          if (listEl) {
+            listEl.innerHTML = '<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:12px;">已保存的记忆：</div>' +
+              json.data.map(m => `
+                <div style="padding:12px;background:#f9fafb;border-radius:8px;margin-bottom:8px;border-left:3px solid #667eea;">
+                  <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
+                    <span style="font-size:12px;color:#6b7280;">📁 ${m.category || '通用'}</span>
+                    <span style="font-size:11px;color:#9ca3af;">v${m.version} · ${m.updated_at || ''}</span>
+                  </div>
+                  <div style="font-size:13px;color:#374151;white-space:pre-wrap;line-height:1.5;">${escapeHtml(m.content)}</div>
+                  <button onclick="deleteProductMemory(${m.id})" style="margin-top:8px;padding:4px 10px;font-size:11px;border:1px solid #ef4444;background:#fff;color:#ef4444;border-radius:4px;cursor:pointer;">删除</button>
+                </div>
+              `).join('');
+          }
+          // 如果只有一个通用记忆，填充到编辑框
+          if (json.data.length === 1 && !json.data[0].store_id) {
+            if (textareaEl) textareaEl.value = json.data[0].content;
+          }
+        } else {
+          if (listEl) listEl.innerHTML = '';
+        }
+      } catch (e) {
+        console.error('加载产品记忆失败:', e);
+      }
+    }
+
+    async function saveProductMemory() {
+      const content = document.getElementById('product-memory-content')?.value?.trim();
+      if (!content) {
+        showToast('请输入产品背景描述', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/agent/product-context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: 'general',
+            content: content
+          })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          showToast('产品记忆已保存！AI 将记住这些信息', 'success');
+          const statusEl = document.getElementById('memory-save-status');
+          if (statusEl) {
+            statusEl.style.display = 'inline';
+            setTimeout(() => statusEl.style.display = 'none', 3000);
+          }
+          // 重新加载记忆列表
+          loadProductMemory();
+        } else {
+          showToast('保存失败: ' + (json.error || '未知错误'), 'error');
+        }
+      } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteProductMemory(id) {
+      if (!confirm('确定要删除这条产品记忆吗？')) return;
+
+      try {
+        const res = await fetch(`/api/agent/product-context/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('已删除', 'success');
+          loadProductMemory();
+          document.getElementById('product-memory-content').value = '';
+        } else {
+          showToast('删除失败', 'error');
+        }
+      } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
   </script>
   <script src="components/sidebar.js"></script>
