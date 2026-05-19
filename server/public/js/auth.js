@@ -3,9 +3,9 @@
  * 自动为所有 API 请求添加 session token
  */
 
-// 获取存储的 token
+// 获取存储的 token（与 login.html 保持一致）
 function getSessionToken() {
-  return localStorage.getItem('session_token');
+  return localStorage.getItem('sessionToken');
 }
 
 // 原始 fetch 方法
@@ -32,7 +32,7 @@ window.fetch = async function(url, options = {}) {
       const data = await response.json();
       if (data.needLogin) {
         // 清除过期的 token
-        localStorage.removeItem('session_token');
+        localStorage.removeItem('sessionToken');
         // 跳转到登录页
         const redirect = encodeURIComponent(window.location.pathname + window.location.search);
         window.location.href = '/login.html?redirect=' + redirect;
@@ -62,7 +62,7 @@ async function logout() {
   try {
     await fetch('/api/auth/logout', { method: 'POST' });
   } catch (e) {}
-  localStorage.removeItem('session_token');
+  localStorage.removeItem('sessionToken');
   window.location.href = '/login.html';
 }
 

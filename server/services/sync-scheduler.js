@@ -15,7 +15,7 @@ let _syncIntervalMs = null; // 缓存当前间隔，null = 未注册
 async function doSync() {
   console.log(`\n[自动同步] 开始同步数据...`);
   const startTime = Date.now();
-  const startDate = _getDateDaysAgo(30); // 默认拉取近30天
+  const startDate = _getDateDaysAgo(7); // 默认拉取近7天（报告接口按天查，减少请求量）
   const endDate = _getDateStr(new Date());
   const errors = [];
 
@@ -23,7 +23,8 @@ async function doSync() {
     // 获取所有店铺
     let stores = [];
     try { stores = await lingxingService.getStores(); } catch (e) { console.warn('[自动同步] 获取店铺列表失败:', e.message); }
-    const storeIds = (stores || []).map(s => s.store_id || s.id).filter(Boolean);
+    // 官方返回字段是 sid（不是 store_id 或 id）
+    const storeIds = (stores || []).map(s => s.sid).filter(Boolean);
 
     // 如果有店铺，逐个同步
     if (storeIds.length > 0) {
@@ -60,19 +61,42 @@ async function doSync() {
 }
 
 async function _syncStore(storeId, startDate, endDate) {
-  let stores = [], products = [], campaigns = [], reportData = { data: [] };
-  try { stores = await lingxingService.getStores(); } catch (e) {}
+  let stores = [], products = [], campaigns = [], allReports = [];
+  try { stores = await lingxingService.getStores(); } catch (e) { console.warn('[同步] 获取店铺失败:', e.message); }
+
   if (storeId) {
-    try { products = await lingxingService.getProducts({ storeId }); } catch (e) {}
-    try { campaigns = await lingxingService.getCampaigns({ storeId }); } catch (e) {}
-    try { reportData = await lingxingService.getAdReport({ storeId, startDate, endDate }); } catch (e) {}
+    // sid 是 int 类型，需要确保传递正确
+    const sidNum = parseInt(storeId) || storeId;
+
+    try {
+      products = await lingxingService.getProducts({ storeId: sidNum });
+    } catch (e) { console.warn('[同步] 获取产品失败:', e.message); }
+
+    try {
+      campaigns = await lingxingService.getCampaigns({ storeId: sidNum });
+    } catch (e) { console.warn('[同步] 获取广告活动失败:', e.message); }
+
+    // 官方报告接口每次只能查一天（report_date），需要按天循环拉取
+    const dates = _getDateRange(startDate, endDate);
+    console.log(`[同步] 准备拉取报告，日期范围: ${startDate} ~ ${endDate}，共 ${dates.length} 天`);
+    for (const date of dates) {
+      try {
+        const dayData = await lingxingService.getCampaignReport({ storeId: sidNum, reportDate: date });
+        // 返回结构：{ data: [...], total: n } 或直接是数组
+        const rows = Array.isArray(dayData) ? dayData : (dayData?.data || []);
+        allReports.push(...rows);
+        console.log(`[同步] ${date} 报告: ${rows.length} 条`);
+      } catch (e) {
+        console.warn(`[同步] ${date} 报告获取失败:`, e.message);
+      }
+    }
   }
 
   // 保存数据
   _saveStores(stores);
   _saveProducts(products);
   _saveCampaigns(campaigns);
-  _saveReports(Array.isArray(reportData) ? reportData : (reportData.data || []));
+  _saveReports(allReports);
 }
 
 function _saveStores(stores) {
@@ -125,47 +149,70 @@ function _saveProducts(products) {
 
 function _saveCampaigns(campaigns) {
   if (!campaigns || campaigns.length === 0) return;
+  console.log(`[同步] 收到 ${campaigns.length} 个广告活动，准备保存...`);
   const stmt = db.getDb().prepare(
     `INSERT OR REPLACE INTO sync_campaigns (campaign_id, campaign_name, type, status, budget, store_id, last_sync_at)
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
   );
+  let savedCount = 0;
   campaigns.forEach(c => {
     try {
       stmt.run(
         c.campaign_id || c.id,
-        c.campaign_name || c.name || '',
-        c.type || c.campaign_type || '',
-        c.status || 'enabled',
-        c.budget || 0,
-        c.store_id || ''
+        // 官方返回字段是 name，兼容 campaign_name
+        c.name || c.campaign_name || '',
+        // 官方返回字段是 campaign_type，兼容 type
+        c.campaign_type || c.type || '',
+        // 官方返回字段是 state，兼容 status
+        c.state || c.status || 'enabled',
+        // 官方返回字段是 daily_budget，兼容 budget
+        c.daily_budget || c.budget || 0,
+        // 官方字段里没有直接的 store_id，可能通过请求时的 sid 关联
+        c.store_id || c.sid || ''
       );
-    } catch (e) {}
+      savedCount++;
+    } catch (e) {
+      console.error('[保存广告活动失败]', e.message);
+    }
   });
+  console.log(`[同步] 广告活动保存完成: ${savedCount}/${campaigns.length}`);
 }
 
 function _saveReports(reports) {
   if (!reports || reports.length === 0) return;
+  console.log(`[同步] 收到 ${reports.length} 条报告数据，准备保存...`);
   const stmt = db.getDb().prepare(
     `INSERT OR REPLACE INTO sync_reports (date, campaign_id, impressions, clicks, cost, sales, orders, ctr, cpc, acos, roas, last_sync_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   );
+  let savedCount = 0;
   reports.forEach(r => {
     try {
+      // 官方返回字段是 report_date（不是 date）
+      const clicks = r.clicks || 0;
+      const impressions = r.impressions || 0;
+      const cost = parseFloat(r.cost) || 0;
+      const sales = parseFloat(r.sales) || 0;
+      const orders = r.orders || 0;
       stmt.run(
-        r.date || r.report_date || '',
+        r.report_date || r.date || '',
         r.campaign_id || r.campaignId || '',
-        r.impressions || 0,
-        r.clicks || 0,
-        r.cost || 0,
-        r.sales || r.revenue || 0,
-        r.orders || r.conversions || 0,
-        r.ctr || 0,
-        r.cpc || 0,
-        r.acos || 0,
-        r.roas || 0
+        impressions,
+        clicks,
+        cost,
+        sales,
+        orders,
+        impressions > 0 ? parseFloat((clicks / impressions * 100).toFixed(4)) : 0,
+        clicks > 0 ? parseFloat((cost / clicks).toFixed(4)) : 0,
+        sales > 0 ? parseFloat((cost / sales * 100).toFixed(4)) : 0,
+        cost > 0 ? parseFloat((sales / cost).toFixed(4)) : 0
       );
-    } catch (e) {}
+      savedCount++;
+    } catch (e) {
+      console.error('[保存报告失败]', e.message);
+    }
   });
+  console.log(`[同步] 报告保存完成: ${savedCount}/${reports.length}`);
 }
 
 function _getDateStr(date) {
@@ -177,6 +224,22 @@ function _getDateDaysAgo(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return _getDateStr(d);
+}
+
+/**
+ * 生成 startDate ~ endDate 之间所有日期数组（含首尾），格式 YYYY-MM-DD
+ * 用于按天循环调用报告接口（官方每次只能查一天）
+ */
+function _getDateRange(startDate, endDate) {
+  const dates = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const cur = new Date(start);
+  while (cur <= end) {
+    dates.push(_getDateStr(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 }
 
 // ── 调度器管理 ───────────────────────────────────────────────────

@@ -111,43 +111,54 @@ class LingxingService {
 
   /**
    * 生成签名 sign
-   * 根据领星文档规则（5步）:
-   * 步骤1: 将所有参数（业务参数 + access_token + app_key + timestamp）按 ASCII 排序
-   * 步骤2: 拼接为 key1=value1&key2=value2 格式（value为空不参与，value为null会参与）
-   * 步骤3: 对拼接字符串进行MD5(32位)加密并转大写
-   * 步骤4: 使用AES/ECB/PKCS5Padding加密MD5值，密钥为AppId
-   * 步骤5: 对最终签名进行URL编码后使用
+   * 官方文档规则（006_newInstructions.md 4.1节）:
+   * a) 所有业务请求入参 + 3个公共参数（access_token、app_key、timestamp）按 ASCII 排序
+   *    ⚠️ 注意：sign 本身不参与签名；POST body参数也需要参与签名
+   * b) key1=value1&key2=value2&...（value为空字符串不参与，null参与）
+   * c) MD5(32位) 后转大写
+   * d) AES/ECB/PKCS5PADDING 加密，密钥为 appId（16字节）
+   * 
+   * 传输时需要对 sign 进行 encodeURIComponent（URL编码）
+   * timestamp 长度取10位（秒级，不是毫秒级）
    */
-  generateSign(params) {
-    // 1. 按 ASCII 排序参数
-    const sortedKeys = Object.keys(params).sort();
+  generateSign(allParams) {
+    // 排除 sign 字段本身
+    const signParams = Object.assign({}, allParams);
+    delete signParams.sign;
+
+    // a) 按 ASCII 排序所有参数键
+    const sortedKeys = Object.keys(signParams).sort();
     
-    // 2. 拼成 key=value&key=value... 格式（value为空不参与，null参与）
+    // b) value为空字符串不参与；null参与；数组/对象类型需先转为string
     const paramPairs = sortedKeys
-      .filter(key => params[key] !== undefined && params[key] !== '')
-      .map(key => `${key}=${params[key]}`);
+      .filter(key => signParams[key] !== undefined && signParams[key] !== '')
+      .map(key => {
+        let val = signParams[key];
+        // 数组或对象需转为JSON字符串参与签名（官方FAQ Q2第6条）
+        if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
+          val = JSON.stringify(val);
+        }
+        return `${key}=${val}`;
+      });
     
     const paramString = paramPairs.join('&');
     console.log('[签名] 原文:', paramString);
     
-    // 3. MD5(32位) 后转大写
+    // c) MD5(32位) 后转大写
     const md5Hash = crypto.createHash('md5').update(paramString).digest('hex').toUpperCase();
     console.log('[签名] MD5:', md5Hash);
     
-    // 4. AES/ECB/PKCS5Padding 加密，密钥 = appId
+    // d) AES/ECB/PKCS5PADDING 加密，密钥为 appId（补齐/截取到16字节）
     const key = this.padKey(this.appId);
     const cipher = crypto.createCipheriv('aes-128-ecb', key, Buffer.alloc(0));
     cipher.setAutoPadding(true);
     let encrypted = cipher.update(md5Hash, 'utf8', 'base64');
     encrypted += cipher.final('base64');
     
-    console.log('[签名] AES结果:', encrypted);
+    console.log('[签名] AES base64:', encrypted);
     
-    // 5. URL 编码
-    const signEncoded = encodeURIComponent(encrypted);
-    console.log('[签名] URL编码后:', signEncoded);
-    
-    return signEncoded;
+    // 返回 base64 原始值（调用方负责 URL 编码）
+    return encrypted;
   }
 
   /**
@@ -165,8 +176,13 @@ class LingxingService {
 
   /**
    * 获取访问令牌 (OAuth)
+   * 官方文档 011_GetToken.md：
    * POST /api/auth-server/oauth/access-token
-   * form-data: appId + appSecret
+   * Content-Type: multipart/form-data
+   * 参数：appId + appSecret
+   * 
+   * ⚠️ appSecret 可能含特殊字符（007_QA.md Q1），需要先 urlencode 再传输
+   * 返回：code="200"（字符串），data.access_token / data.refresh_token / data.expires_in
    */
   async getAccessToken() {
     if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
@@ -178,26 +194,42 @@ class LingxingService {
       console.log('正在请求领星Token:', url);
       console.log('AppId:', this.appId);
       
-      const formData = new URLSearchParams();
-      formData.append('appId', this.appId);
-      formData.append('appSecret', this.appSecret);
-      
-      const response = await axios.post(url, formData.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      // 官方要求 multipart/form-data
+      // appSecret 含特殊字符时需要 urlencode（QA Q1）
+      // 用 URLSearchParams 并设置正确的 Content-Type 也可以（form-data 本质等价）
+      // 这里用 axios multipart 方式，兼容性最强
+      const { Readable } = require('stream');
+      const boundary = `----FormBoundary${Date.now()}`;
+      const body = [
+        `--${boundary}`,
+        `Content-Disposition: form-data; name="appId"`,
+        '',
+        this.appId,
+        `--${boundary}`,
+        `Content-Disposition: form-data; name="appSecret"`,
+        '',
+        encodeURIComponent(this.appSecret),
+        `--${boundary}--`
+      ].join('\r\n');
+
+      const response = await axios.post(url, body, {
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`
+        }
       });
 
       console.log('Token响应:', JSON.stringify(response.data));
 
-      // 领星返回 code: 0 表示成功（不是200）
-      if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
+      // 官方返回 code:"200"（字符串），兼容数字200
+      if (response.data.code === '200' || response.data.code === 200) {
         this.accessToken = response.data.data.access_token;
         this.refreshToken = response.data.data.refresh_token;
-        // expires_in 单位是秒，提前5分钟过期
+        // expires_in 单位是秒（示例值7199），提前5分钟过期
         this.tokenExpiry = Date.now() + (response.data.data.expires_in - 300) * 1000;
         console.log('Token获取成功，过期时间:', new Date(this.tokenExpiry).toLocaleString());
         return this.accessToken;
       } else {
-        throw new Error(response.data.msg || `获取令牌失败: ${response.data.code}`);
+        throw new Error(response.data.msg || `获取令牌失败: code=${response.data.code}`);
       }
     } catch (error) {
       if (error.response) {
@@ -211,28 +243,42 @@ class LingxingService {
 
   /**
    * 刷新访问令牌
+   * 官方文档 012_RefreshToken.md：
    * POST /api/auth-server/oauth/refresh
+   * Content-Type: multipart/form-data
+   * 参数：appId + refreshToken
+   * ⚠️ 每个 refresh_token 只能使用一次！
    */
   async refreshAccessToken() {
     try {
       const url = `${this.baseUrl}/api/auth-server/oauth/refresh`;
       console.log('正在刷新领星Token:', url);
-      
-      const formData = new URLSearchParams();
-      formData.append('appId', this.appId);
-      formData.append('refreshToken', this.refreshToken);
-      
-      const response = await axios.post(url, formData.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+      const boundary = `----FormBoundary${Date.now()}`;
+      const body = [
+        `--${boundary}`,
+        `Content-Disposition: form-data; name="appId"`,
+        '',
+        this.appId,
+        `--${boundary}`,
+        `Content-Disposition: form-data; name="refreshToken"`,
+        '',
+        this.refreshToken,
+        `--${boundary}--`
+      ].join('\r\n');
+
+      const response = await axios.post(url, body, {
+        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` }
       });
 
-      if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
+      if (response.data.code === '200' || response.data.code === 200) {
         this.accessToken = response.data.data.access_token;
-        this.refreshToken = response.data.data.refresh_token;
+        this.refreshToken = response.data.data.refresh_token; // 每次续约会生成新的 refresh_token
         this.tokenExpiry = Date.now() + (response.data.data.expires_in - 300) * 1000;
+        console.log('Token续约成功，过期时间:', new Date(this.tokenExpiry).toLocaleString());
         return this.accessToken;
       } else {
-        throw new Error(response.data.msg || `刷新令牌失败: ${response.data.code}`);
+        throw new Error(response.data.msg || `刷新令牌失败: code=${response.data.code}`);
       }
     } catch (error) {
       console.error('刷新Token失败:', error.message);
@@ -241,78 +287,90 @@ class LingxingService {
   }
 
   /**
-   * 生成带签名的公共请求参数
-   */
-  async buildCommonParams() {
-    const token = await this.getAccessToken();
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    
-    const params = {
-      access_token: token,
-      app_key: this.appId,
-      timestamp: timestamp
-    };
-    
-    // 生成签名
-    params.sign = this.generateSign(params);
-    
-    return params;
-  }
-
-  /**
    * 通用API请求
-   * GET: 业务参数 + 公共参数 都拼在 URL 上
-   * POST: 公共参数拼在 URL 上，业务参数放 Body (JSON)
+   * 官方文档 006_newInstructions.md 2.3节：
+   * 
+   * GET请求：业务参数 + 公共参数全部拼接在URL上
+   * POST请求：
+   *   - URL上只放4个公共参数（access_token, app_key, timestamp, sign）
+   *   - 业务参数放 body（json格式）
+   *   - 但签名时，业务参数需要参与签名（重要！）
+   * 
+   * ⚠️ sign 的 URL 编码：sign 放 URL 时必须做 encodeURIComponent
+   * ⚠️ 响应码：/erp/ 路径成功返回 code:0；/api/auth-server/ 返回 code:"200"
+   * ⚠️ timestamp：10位秒级时间戳，不是13位毫秒级
+   * ⚠️ 不要缓存 sign，每次请求都要用实时 timestamp 重新生成
    */
   async request(method, endpoint, bizParams = {}, bizData = null) {
-    const commonParams = await this.buildCommonParams();
-    
-    // 合并公共参数和业务参数（用于签名）
-    let signParams = { ...commonParams, ...bizParams };
+    const token = await this.getAccessToken();
+    // timestamp 必须是10位秒级（官方FAQ Q2: 参与签名的时间戳长度取10位）
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+
+    // 组装公共参数（不含sign）
+    const commonParams = {
+      access_token: token,
+      app_key: this.appId,
+      timestamp
+    };
+
+    // 签名参数 = 公共参数 + 所有业务参数（GET的bizParams + POST的bizData）
+    // 官方规则4.1: "所有的业务请求入参+3个固定参数"一起签名
+    const allSignParams = { ...commonParams, ...bizParams };
     if (method === 'POST' && bizData) {
-      // 把 body 参数也加入签名
-      signParams = { ...signParams, ...bizData };
+      // POST body 参数也参与签名（数组/对象会在generateSign内转JSON字符串）
+      Object.assign(allSignParams, bizData);
     }
-    
-    // 构建 URL（只放公共参数 + URL 业务参数）
-    const urlParams = { ...commonParams, ...bizParams };
+    const sign = this.generateSign(allSignParams);
+
+    // URL 上放公共参数 + sign（sign需URL编码）
+    // GET时额外把bizParams也放URL；POST时bizParams通常为空
+    const urlParams = { ...commonParams, ...bizParams, sign };
     const queryString = Object.entries(urlParams)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .map(([k, v]) => {
+        if (k === 'sign') {
+          return `sign=${encodeURIComponent(v)}`;
+        }
+        return `${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+      })
       .join('&');
-    
+
     const url = `${this.baseUrl}${endpoint}?${queryString}`;
-    
-    const config = {
+
+    const reqConfig = {
       method,
       url,
       headers: {
         'Content-Type': 'application/json',
-        'X-API-VERSION': '2'  // 使用 offset 分页模式
+        'X-API-VERSION': '2'
       }
     };
-    
-    // POST 请求：业务参数放 Body
+
+    // POST：业务参数放 body（JSON）
     if (method === 'POST' && bizData) {
-      config.data = bizData;
+      reqConfig.data = bizData;
     }
 
     try {
       console.log(`[${method}] ${endpoint}`);
-      const response = await axios(config);
-      
-      // 打印完整响应，方便调试
+      const response = await axios(reqConfig);
       console.log(`[响应] ${endpoint}:`, JSON.stringify(response.data).substring(0, 500));
-      
-      if (response.data.code === '200' || response.data.code === 200 || response.data.code === '0' || response.data.code === 0) {
+
+      const code = response.data.code;
+      // /erp/ 路径成功返回 code:0（数字）；其他路径也可能返回 code:0
+      if (code === 0 || code === '0' || code === '200' || code === 200) {
         return response.data.data;
       } else {
-        throw new Error(response.data.msg || `API错误: ${response.data.code}`);
+        const msg = response.data.message || response.data.msg || `API错误: code=${code}`;
+        console.error(`[接口错误] ${endpoint}: ${msg}`);
+        throw new Error(msg);
       }
     } catch (error) {
-      console.error(`[错误] ${endpoint}:`, error.message);
       if (error.response) {
-        console.error(`[HTTP错误] ${error.response.status}:`, JSON.stringify(error.response.data).substring(0, 500));
-        throw new Error(`API请求失败: ${error.response.status} - ${error.response.data?.msg || error.message}`);
+        console.error(`[HTTP错误] ${endpoint} ${error.response.status}:`, JSON.stringify(error.response.data).substring(0, 500));
+        throw new Error(`API请求失败: ${error.response.status} - ${error.response.data?.msg || error.response.data?.message || error.message}`);
+      }
+      if (!error.message.startsWith('API')) {
+        console.error(`[请求异常] ${endpoint}:`, error.message);
       }
       throw error;
     }
@@ -337,7 +395,10 @@ class LingxingService {
 
   /**
    * 获取店铺列表
-   * API: /erp/sc/data/seller/lists (GET)
+   * 官方文档 015_SellerLists.md：
+   * GET /erp/sc/data/seller/lists
+   * 返回字段：sid(店铺id), name(店铺名), country(国家), region(站点简称), status(0停/1正常/2异常/3欠费)
+   * ⚠️ 注意：字段是 sid/name，不是 store_id/store_name
    */
   async getStores() {
     if (this.mockMode) {
@@ -372,24 +433,31 @@ class LingxingService {
 
   /**
    * 获取SP广告活动列表
-   * API: /pb/openapi/newad/spCampaigns (POST)
+   * 官方文档 333_spCampaigns.md：
+   * POST /pb/openapi/newad/spCampaigns
+   * 参数：sid(int,必填) + profile_id(与sid二选一) + state(不传=所有) + offset + length
+   * ⚠️ sid 是 int 类型（来自店铺列表的 sid 字段）
+   * ⚠️ state 不传则返回所有状态，不要默认设为 'enabled'
    */
   async getCampaigns(params = {}) {
     if (this.mockMode) {
       console.log('[Mock] 返回广告活动列表');
       let campaigns = MOCK_DATA.campaigns;
-      if (params.storeId) {
-        campaigns = campaigns.filter(c => c.store_id === params.storeId);
+      if (params.storeId || params.sid) {
+        const sid = params.sid || params.storeId;
+        campaigns = campaigns.filter(c => c.store_id === sid);
       }
       return campaigns;
     }
-    return await this.request('POST', '/pb/openapi/newad/spCampaigns', {}, {
-      sid: params.sid || params.storeId,
-      profile_id: params.profileId,
-      state: params.state || 'enabled',
+    const sid = params.sid || params.storeId;
+    const body = {
       offset: params.offset || 0,
-      length: params.length || 15
-    });
+      length: params.length || 100
+    };
+    if (sid !== undefined && sid !== null && sid !== '') body.sid = parseInt(sid) || sid;
+    if (params.profileId) body.profile_id = params.profileId;
+    if (params.state) body.state = params.state; // 不传则返回所有状态
+    return await this.request('POST', '/pb/openapi/newad/spCampaigns', {}, body);
   }
 
   /**
@@ -582,21 +650,27 @@ class LingxingService {
 
   /**
    * 获取SP广告活动报告
-   * API: /pb/openapi/newad/spCampaignReports (POST)  ← 新增
+   * 官方文档 294_spCampaignReports.md：
+   * POST /pb/openapi/newad/spCampaignReports
+   * 参数：sid(必填,int) + report_date(必填,格式Y-m-d) + show_detail(0/1) + offset + length
+   * ⚠️ report_date 是必填参数，每次只能查一天
+   * ⚠️ 若要拉取多天数据需要循环调用
    */
   async getCampaignReport(params = {}) {
     if (this.mockMode) {
       console.log('[Mock] 返回广告活动报告');
       return { data: [], total: 0 };
     }
-    return await this.request('POST', '/pb/openapi/newad/spCampaignReports', {}, {
-      sid: params.sid || params.storeId,
-      profile_id: params.profileId,
+    const sid = params.sid || params.storeId;
+    const body = {
       report_date: params.reportDate || params.startDate,
       show_detail: params.showDetail ? 1 : 0,
       offset: params.offset || 0,
       length: params.length || 100
-    });
+    };
+    if (sid !== undefined && sid !== null && sid !== '') body.sid = parseInt(sid) || sid;
+    if (params.profileId) body.profile_id = params.profileId;
+    return await this.request('POST', '/pb/openapi/newad/spCampaignReports', {}, body);
   }
 
   /**

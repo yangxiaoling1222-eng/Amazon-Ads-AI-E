@@ -1246,7 +1246,7 @@
     // 退出登录
     function logout() {
       if (confirm('确定要退出登录吗？')) {
-        localStorage.removeItem('session_token');
+        localStorage.removeItem('sessionToken');
         window.location.href = '/login.html';
       }
     }

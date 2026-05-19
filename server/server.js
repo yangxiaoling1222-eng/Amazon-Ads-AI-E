@@ -34,8 +34,36 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 简单的会话管理（内存存储）
-const sessions = new Map();
+// 简单的会话管理（持久化到 JSON 文件，避免重启丢失）
+const fs = require('fs');
+const sessionsPath = path.join(__dirname, 'data', 'sessions.json');
+
+function loadSessions() {
+  try {
+    if (fs.existsSync(sessionsPath)) {
+      const raw = fs.readFileSync(sessionsPath, 'utf8');
+      const entries = JSON.parse(raw);
+      const now = Date.now();
+      // 过滤掉过期的
+      return new Map(entries.filter(([, s]) => s.expiry > now));
+    }
+  } catch (e) {
+    console.error('加载会话失败:', e.message);
+  }
+  return new Map();
+}
+
+function saveSessions() {
+  try {
+    const dir = path.dirname(sessionsPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(sessionsPath, JSON.stringify([...sessions.entries()], null, 2), 'utf8');
+  } catch (e) {
+    console.error('保存会话失败:', e.message);
+  }
+}
+
+const sessions = loadSessions();
 
 // 密码验证中间件
 function authMiddleware(req, res, next) {
@@ -43,19 +71,28 @@ function authMiddleware(req, res, next) {
   if (!SYSTEM_PASSWORD) {
     return next();
   }
-  
+
   // 检查 session token
   const token = req.headers['x-session-token'];
+  console.log('[authMiddleware]', req.method, req.path,
+    '收到token:', token ? token.slice(0,8)+'...' : '无',
+    'sessions中有:', sessions.has(token),
+    'sessions总数:', sessions.size,
+    '所有keys:', [...sessions.keys()].map(k=>k.slice(0,6)));
   if (token && sessions.has(token)) {
     const session = sessions.get(token);
     if (session.expiry > Date.now()) {
       return next();
     }
     sessions.delete(token);
+    saveSessions();
   }
-  
-  // 返回未授权
-  res.status(401).json({ error: '需要登录', needLogin: true });
+
+  // 返回未授权（加缓存禁止头，防止浏览器缓存401）
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.status(401).json({ error: '需要登录', message: '需要登录', needLogin: true });
 }
 
 // 登录接口
@@ -73,7 +110,8 @@ app.post('/api/auth/login', (req, res) => {
       expiry: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7天过期
       createdAt: Date.now()
     });
-    
+    saveSessions();
+
     res.json({ success: true, token });
   } else {
     res.status(401).json({ success: false, error: '密码错误' });
@@ -85,6 +123,7 @@ app.post('/api/auth/logout', (req, res) => {
   const token = req.headers['x-session-token'];
   if (token) {
     sessions.delete(token);
+    saveSessions();
   }
   res.json({ success: true });
 });
@@ -102,8 +141,9 @@ app.get('/api/auth/status', (req, res) => {
       return res.json({ loggedIn: true, hasPassword: true });
     }
     sessions.delete(token);
+    saveSessions();
   }
-  
+
   res.json({ loggedIn: false, hasPassword: true });
 });
 
@@ -135,8 +175,9 @@ app.get('/:page.html', (req, res, next) => {
       return next();
     }
     sessions.delete(token);
+    saveSessions();
   }
-  
+
   // 未登录，跳转到登录页
   res.redirect('/login.html?redirect=' + encodeURIComponent(req.originalUrl));
 });
@@ -185,6 +226,16 @@ app.use('/api/agent', authMiddleware, agentRoutes);
 app.use('/api/scheduler', authMiddleware, schedulerRoutes);
 app.use('/api/keywords', authMiddleware, keywordRoutes);
 app.use('/api', authMiddleware, apiRoutes);
+
+// 调试：回显收到的请求头
+app.get('/api/debug/headers', (req, res) => {
+  res.json({
+    headers: req.headers,
+    token: req.headers['x-session-token'],
+    sessionsSize: sessions.size,
+    hasToken: sessions.has(req.headers['x-session-token'])
+  });
+});
 
 // 健康检查
 app.get('/health', (req, res) => {

@@ -529,6 +529,11 @@
       const token = localStorage.getItem('sessionToken');
       return token ? { 'x-session-token': token } : {};
     }
+
+    // 统一提取后端错误信息
+    function getErrorMessage(data, fallback = '未知错误') {
+      return data?.message || data?.error || fallback;
+    }
     
     // 同步店铺
     async function syncStores() {
@@ -536,19 +541,28 @@
       addLog('info', '开始同步店铺数据...');
       
       try {
-        const res = await fetch(`${API_BASE}/lingxing/stores`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetch(`${API_BASE}/lingxing/stores`);
+        console.log('[syncStores] 响应status:', res.status);
         const data = await res.json();
+        console.log('[syncStores] 响应data:', JSON.stringify(data).slice(0, 200));
+        
+        if (res.status === 401) {
+          const msg = getErrorMessage(data);
+          updateStatus('stores', 'error', '需要重新登录');
+          addLog('error', `店铺同步失败(${res.status}): ${msg}`);
+          showToast(`请重新登录: ${msg}`, 'error');
+          return;
+        }
         
         if (data.success) {
           updateStatus('stores', 'success', `已同步 (${data.data.length || 0}个店铺)`);
           addLog('success', `店铺数据同步成功，共 ${data.data.length || 0} 个店铺`);
           showToast('店铺同步成功', 'success');
         } else {
+          const msg = getErrorMessage(data);
           updateStatus('stores', 'error', '同步失败');
-          addLog('error', `店铺同步失败: ${data.message}`);
-          showToast('店铺同步失败: ' + data.message, 'error');
+          addLog('error', `店铺同步失败: ${msg}`);
+          showToast('店铺同步失败: ' + msg, 'error');
         }
       } catch (err) {
         updateStatus('stores', 'error', '网络错误');
@@ -563,9 +577,7 @@
       addLog('info', '开始同步产品数据...');
       
       try {
-        const res = await fetch(`${API_BASE}/lingxing/products?pageSize=100`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetch(`${API_BASE}/lingxing/products?pageSize=100`);
         const data = await res.json();
         
         if (data.success) {
@@ -573,9 +585,10 @@
           addLog('success', `产品数据同步成功，共 ${data.data.length || 0} 个产品`);
           showToast('产品同步成功', 'success');
         } else {
+          const msg = getErrorMessage(data);
           updateStatus('products', 'error', '同步失败');
-          addLog('error', `产品同步失败: ${data.message}`);
-          showToast('产品同步失败: ' + data.message, 'error');
+          addLog('error', `产品同步失败: ${msg}`);
+          showToast('产品同步失败: ' + msg, 'error');
         }
       } catch (err) {
         updateStatus('products', 'error', '网络错误');
@@ -590,9 +603,7 @@
       addLog('info', '开始同步广告活动...');
       
       try {
-        const res = await fetch(`${API_BASE}/lingxing/campaigns?pageSize=100`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetch(`${API_BASE}/lingxing/campaigns?pageSize=100`);
         const data = await res.json();
         
         if (data.success) {
@@ -600,9 +611,10 @@
           addLog('success', `广告活动同步成功，共 ${data.data.length || 0} 个活动`);
           showToast('广告活动同步成功', 'success');
         } else {
+          const msg = getErrorMessage(data);
           updateStatus('campaigns', 'error', '同步失败');
-          addLog('error', `广告活动同步失败: ${data.message}`);
-          showToast('广告活动同步失败: ' + data.message, 'error');
+          addLog('error', `广告活动同步失败: ${msg}`);
+          showToast('广告活动同步失败: ' + msg, 'error');
         }
       } catch (err) {
         updateStatus('campaigns', 'error', '网络错误');
@@ -623,10 +635,7 @@
         
         const res = await fetch(`${API_BASE}/lingxing/sync`, {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...getAuthHeaders()
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ startDate, endDate })
         });
         const data = await res.json();
@@ -636,9 +645,10 @@
           addLog('success', `广告报告同步成功 (${startDate} 至 ${endDate})`);
           showToast('报告同步成功', 'success');
         } else {
+          const msg = getErrorMessage(data);
           updateStatus('report', 'error', '同步失败');
-          addLog('error', `报告同步失败: ${data.message}`);
-          showToast('报告同步失败: ' + data.message, 'error');
+          addLog('error', `报告同步失败: ${msg}`);
+          showToast('报告同步失败: ' + msg, 'error');
         }
       } catch (err) {
         updateStatus('report', 'error', '网络错误');
@@ -651,17 +661,52 @@
     function viewStores() {
       window.location.href = 'system-logs.html';
     }
-    
+
     function viewProducts() {
       window.location.href = 'system-logs.html';
     }
-    
+
     function viewCampaigns() {
       window.location.href = 'system-logs.html';
     }
-    
+
     function viewReport() {
       window.location.href = 'system-logs.html';
+    }
+
+    // 调试诊断
+    async function runDebug() {
+      const out = document.getElementById('debug-output');
+      out.style.display = 'block';
+      out.textContent = '正在诊断...\n';
+
+      const token = localStorage.getItem('sessionToken');
+      out.textContent += `1. localStorage token: ${token ? token.slice(0,8)+'...' : '无'}\n`;
+      out.textContent += `2. window.fetch 被拦截: ${window.fetch.toString().includes('auth-check') ? '是' : '需检查'}\n`;
+
+      try {
+        // 测试1：直接调用debug端点
+        out.textContent += '\n正在测试 /api/debug/headers...\n';
+        const r1 = await fetch('/api/debug/headers');
+        const d1 = await r1.json();
+        out.textContent += `状态: ${r1.status}\n`;
+        out.textContent += `服务端收到token: ${d1.token ? d1.token.slice(0,8)+'...' : '无'}\n`;
+        out.textContent += `sessions中是否存在: ${d1.hasToken}\n`;
+
+        // 测试2：调用stores接口（经过authMiddleware）
+        out.textContent += '\n正在测试 /api/lingxing/stores...\n';
+        const r2 = await fetch('/api/lingxing/stores');
+        const d2 = await r2.json();
+        out.textContent += `状态: ${r2.status}\n`;
+        out.textContent += `success: ${d2.success}\n`;
+        out.textContent += `message: ${d2.message || d2.error || '-'}\n`;
+        out.textContent += `数据条数: ${d2.data?.length || 0}\n`;
+
+      } catch(e) {
+        out.textContent += `错误: ${e.message}\n`;
+      }
+
+      out.textContent += '\n✅ 诊断完成';
     }
   </script>
 </body>
