@@ -524,13 +524,21 @@
       }
     }
     
+    // 获取认证头
+    function getAuthHeaders() {
+      const token = localStorage.getItem('sessionToken');
+      return token ? { 'x-session-token': token } : {};
+    }
+    
     // 同步店铺
     async function syncStores() {
       updateStatus('stores', 'loading', '同步中...');
       addLog('info', '开始同步店铺数据...');
       
       try {
-        const res = await fetch(`${API_BASE}/lingxing/stores`);
+        const res = await fetch(`${API_BASE}/lingxing/stores`, {
+          headers: getAuthHeaders()
+        });
         const data = await res.json();
         
         if (data.success) {
@@ -555,7 +563,9 @@
       addLog('info', '开始同步产品数据...');
       
       try {
-        const res = await fetch(`${API_BASE}/lingxing/products?pageSize=100`);
+        const res = await fetch(`${API_BASE}/lingxing/products?pageSize=100`, {
+          headers: getAuthHeaders()
+        });
         const data = await res.json();
         
         if (data.success) {
@@ -580,7 +590,9 @@
       addLog('info', '开始同步广告活动...');
       
       try {
-        const res = await fetch(`${API_BASE}/lingxing/campaigns?pageSize=100`);
+        const res = await fetch(`${API_BASE}/lingxing/campaigns?pageSize=100`, {
+          headers: getAuthHeaders()
+        });
         const data = await res.json();
         
         if (data.success) {
@@ -611,7 +623,10 @@
         
         const res = await fetch(`${API_BASE}/lingxing/sync`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getAuthHeaders()
+          },
           body: JSON.stringify({ startDate, endDate })
         });
         const data = await res.json();

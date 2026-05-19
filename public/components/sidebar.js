@@ -57,6 +57,7 @@ class SidebarComponent {
 
   logout() {
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('sessionToken');
     window.location.href = 'login.html';
   }
 
@@ -297,6 +298,7 @@ class SidebarComponent {
 // 全局退出登录函数
 function logout() {
   localStorage.removeItem('currentUser');
+  localStorage.removeItem('sessionToken');
   window.location.href = 'login.html';
 }
 
