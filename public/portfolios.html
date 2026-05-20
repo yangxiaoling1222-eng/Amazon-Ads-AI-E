@@ -662,7 +662,7 @@
       });
     }
 
-    // 加载广告组合列表
+    // 加载广告组合列表（优先用分配管理表，fallback到广告活动数据）
     async function loadPortfolios() {
       const storeFilter = document.getElementById('storeFilter')?.value || '';
       const ownerFilter = document.getElementById('ownerFilter')?.value || '';
@@ -671,7 +671,7 @@
       try {
         const response = await fetch(`${API_BASE}/portfolios`);
         const result = await response.json();
-        if (result.success) {
+        if (result.success && result.data && result.data.length > 0) {
           portfolios = result.data.map(p => ({
             id: p.id,
             name: p.name,
@@ -683,11 +683,15 @@
             currentAcos: p.current_acos,
             createdAt: p.created_at
           }));
+        } else {
+          // 分配管理表无数据 → 从 lingxing 广告活动数据构建
+          portfolios = await loadPortfoliosFromLingxing(storeFilter);
         }
       } catch (error) {
         console.error('加载广告组合失败:', error);
-        // 使用模拟数据作为后备
-        portfolios = getMockPortfolios();
+        // 尝试从 lingxing 获取
+        try { portfolios = await loadPortfoliosFromLingxing(storeFilter); } 
+        catch(e2) { portfolios = getMockPortfolios(); }
       }
 
       // 应用筛选
@@ -709,7 +713,31 @@
       updateStats(filteredPortfolios);
     }
 
-    // 模拟广告组合数据（后备）
+    // 从领星广告活动数据构建组合列表（当分配管理表无数据时的fallback）
+    async function loadPortfoliosFromLingxing(storeFilter) {
+      try {
+        const params = storeFilter ? `?storeId=${storeFilter}` : '';
+        const res = await fetch(`/api/lingxing/portfolios${params}`);
+        const data = await res.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+          return data.data.slice(0, 20).map((c, i) => ({
+            id: c.campaign_id || `LX-${i}`,
+            name: c.campaign_name || c.campaign_id || '未命名活动',
+            storeId: c.store_id || '',
+            storeName: c.store_id || '',
+            ownerId: null,
+            ownerName: null,
+            targetAcos: 25,
+            currentAcos: parseFloat((c.acos || 0).toFixed(1)),
+            createdAt: new Date().toISOString().slice(0,19).replace('T',' ')
+          }));
+        }
+      } catch(e) { console.warn('lingxing portfolios fallback也失败:', e); }
+      return getMockPortfolios();
+    }
+
+    // 模拟广告组合数据（最终后备）
     function getMockPortfolios() {
       return [
         { id: 'P001', name: '电子类产品组合', storeId: 'store_us', storeName: '美国站', ownerId: 'U002', ownerName: '李华', targetAcos: 15, currentAcos: 12.3, createdAt: '2024-01-20 10:00:00' },

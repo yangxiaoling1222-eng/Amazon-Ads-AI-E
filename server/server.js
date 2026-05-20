@@ -147,6 +147,11 @@ app.get('/api/auth/status', (req, res) => {
   res.json({ loggedIn: false, hasPassword: true });
 });
 
+// 根路径重定向到首页
+app.get('/', (req, res) => {
+  res.redirect('/index.html');
+});
+
 // 静态文件服务（带登录检查）
 app.use(express.static(path.join(__dirname, '../public'), {
   index: false // 禁用默认index

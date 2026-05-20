@@ -745,12 +745,17 @@
       <!-- 头部 -->
       <div class="header">
         <h2>数据概览</h2>
-        <div class="connection-status">
-          <div class="status-dot" id="lingxingStatus" style="background: var(--text-secondary);"></div>
-          <span>领星 ERP</span>
-          <div class="status-dot" id="amazonStatus" style="background: var(--text-secondary);"></div>
-          <span>亚马逊 API</span>
-          <span id="dataSourceLabel" style="margin-left: 8px; color: var(--primary); font-weight: 500;">未配置数据源</span>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div class="connection-status">
+            <div class="status-dot" id="lingxingStatus" style="background: var(--text-secondary);"></div>
+            <span>领星 ERP</span>
+            <div class="status-dot" id="amazonStatus" style="background: var(--text-secondary);"></div>
+            <span>亚马逊 API</span>
+          </div>
+          <select id="dashboardStoreFilter" onchange="onDashboardStoreChange()" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-card);color:var(--text-primary);cursor:pointer;min-width:160px;">
+            <option value="">全部店铺</option>
+          </select>
+          <span id="dataSourceLabel" style="color: var(--primary); font-weight: 500;">未配置数据源</span>
         </div>
       </div>
 
@@ -875,25 +880,9 @@
         </div>
         
         <div class="portfolio-targets" id="portfolioTargets">
-          <div class="portfolio-item">
-            <div class="portfolio-info">
-              <h4>默认广告组合</h4>
-              <span>目标 ACOS: 15%</span>
-            </div>
-            <div class="portfolio-acos">
-              <div class="current">12.3%</div>
-              <div class="target">当前 ACOS</div>
-            </div>
-          </div>
-          <div class="portfolio-item">
-            <div class="portfolio-info">
-              <h4>新品推广组合</h4>
-              <span>目标 ACOS: 20%</span>
-            </div>
-            <div class="portfolio-acos">
-              <div class="current" style="color: var(--warning);">18.7%</div>
-              <div class="target">当前 ACOS</div>
-            </div>
+          <!-- 动态加载，数据来自 /api/lingxing/portfolios -->
+          <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">
+            加载中...
           </div>
         </div>
       </div>
@@ -911,56 +900,8 @@
         </div>
 
         <div class="suggestion-list" id="suggestionList">
-          <div class="suggestion-item" data-type="BID_DECREASE" data-priority="high">
-            <div class="suggestion-priority high"></div>
-            <div class="suggestion-content">
-              <div class="suggestion-type">降低出价</div>
-              <div class="suggestion-title">Auto - Broad 电子产品</div>
-              <div class="suggestion-reason">ACOS 25.3% 超出目标 15%，建议降低出价 15%，预计可节省 $45/天</div>
-              <div class="suggestion-actions">
-                <button class="btn btn-primary">执行建议</button>
-                <button class="btn btn-secondary">查看详情</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="suggestion-item" data-type="PAUSE_CAMPAIGN" data-priority="high">
-            <div class="suggestion-priority high"></div>
-            <div class="suggestion-content">
-              <div class="suggestion-type">暂停活动</div>
-              <div class="suggestion-title">手动 - 精准匹配 测试词A</div>
-              <div class="suggestion-reason">花费 $156 无任何转化，建议立即暂停</div>
-              <div class="suggestion-actions">
-                <button class="btn btn-primary">暂停活动</button>
-                <button class="btn btn-secondary">查看详情</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="suggestion-item" data-type="ADD_NEGATIVE" data-priority="medium">
-            <div class="suggestion-priority medium"></div>
-            <div class="suggestion-content">
-              <div class="suggestion-type">添加否定词</div>
-              <div class="suggestion-title">Auto - Exact 配件类</div>
-              <div class="suggestion-reason">发现 8 个高花费低转化关键词，建议添加为否定词</div>
-              <div class="suggestion-actions">
-                <button class="btn btn-primary">添加否定词</button>
-                <button class="btn btn-secondary">查看详情</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="suggestion-item" data-type="BID_INCREASE" data-priority="low">
-            <div class="suggestion-priority low"></div>
-            <div class="suggestion-content">
-              <div class="suggestion-type">提高出价</div>
-              <div class="suggestion-title">手动 - 词组匹配 爆款产品</div>
-              <div class="suggestion-reason">ACOS 8.2% 远低于目标，有提价空间，建议提高出价 10%</div>
-              <div class="suggestion-actions">
-                <button class="btn btn-primary">执行建议</button>
-                <button class="btn btn-secondary">查看详情</button>
-              </div>
-            </div>
+          <div style="text-align:center;padding:32px;color:var(--text-secondary);font-size:13px;">
+            💡 优化建议将根据广告数据自动生成，当前暂无建议
           </div>
         </div>
       </div>
@@ -1285,55 +1226,96 @@
     }
 
     // 设置花费趋势时间周期
-    function setSpendPeriod(days, btn) {
+    async function setSpendPeriod(days, btn) {
       spendPeriod = days;
       
       // 更新按钮状态
       btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       
-      // 重新加载数据
-      const data = generateMockTrendData(days);
-      initSpendSalesChart(data);
+      // 重新从API加载
+      await loadChartData();
     }
 
     // 设置 ACOS 趋势时间周期
-    function setAcosPeriod(days, btn) {
+    async function setAcosPeriod(days, btn) {
       acosPeriod = days;
       
       // 更新按钮状态
       btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       
-      // 重新加载数据
-      const data = generateMockTrendData(days);
-      initAcosChart(data);
+      // 重新从API加载
+      await loadChartData();
     }
 
-    // 加载图表数据
+    // 加载图表数据（从真实API获取）
     async function loadChartData() {
       try {
-        // 尝试从后端获取趋势数据
-        const res = await fetch(`${API_BASE}/lingxing/trend?days=${spendPeriod}`);
-        
+        const params = new URLSearchParams({ days: spendPeriod });
+        if (currentStoreId) params.set('storeId', currentStoreId);
+        const res = await fetch(`${API_BASE}/lingxing/trend?${params}`);
         if (res.ok) {
           const result = await res.json();
-          if (result.success && result.data) {
-            initSpendSalesChart(result.data);
-            initAcosChart(result.data);
+          if (result.success && result.data && result.data.length) {
+            // 将API返回的数组格式转换为Chart.js需要的格式
+            const chartData = transformTrendData(result.data);
+            initSpendSalesChart(chartData);
+            initAcosChart(chartData);
             return;
           }
         }
       } catch (e) {
-        console.log('使用模拟趋势数据');
+        console.log('趋势API获取失败，使用模拟数据');
       }
-      
-      // 使用模拟数据
+
+      // fallback到模拟数据
       const spendData = generateMockTrendData(spendPeriod);
       const acosData = generateMockTrendData(acosPeriod);
-      
       initSpendSalesChart(spendData);
       initAcosChart(acosData);
+    }
+
+    // 将后端trend数组转换为Chart.js格式: {labels, spendData, salesData, acosData}
+    function transformTrendData(apiData) {
+      const labels = apiData.map(d => (d.date || '').slice(5) || ''); // MM-DD
+      const spendData = apiData.map(d => d.cost || 0);
+      const salesData  = apiData.map(d => d.sales || 0);
+      const acosData   = apiData.map(d => d.acos || (d.sales > 0 ? (d.cost / d.sales * 100) : 0));
+      return { labels, spendData, salesData, acosData };
+    }
+
+    // 当前选中的店铺
+    let currentStoreId = '';
+
+    // 加载店铺列表到筛选框
+    async function loadDashboardStores() {
+      try {
+        const res = await fetch(`${API_BASE}/lingxing/stores`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const select = document.getElementById('dashboardStoreFilter');
+          select.innerHTML = '<option value="">全部店铺</option>';
+          data.data.forEach(s => {
+            const name = s.store_name || s.name || s.marketplace || s.sid;
+            select.innerHTML += `<option value="${s.id || s.store_id || s.sid}">${escHtml(name)}</option>`;
+          });
+        }
+      } catch (e) { console.log('加载店铺列表失败:', e); }
+    }
+
+    // 店铺切换事件
+    function onDashboardStoreChange() {
+      currentStoreId = document.getElementById('dashboardStoreFilter').value;
+      loadDashboardData();
+      loadChartData();
+    }
+
+    // HTML转义防止XSS
+    function escHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     // ========== 加载数据 ==========
@@ -1343,11 +1325,11 @@
         try {
           const lingxingTest = await fetch(`${API_BASE}/lingxing/test`);
           const lingxingData = await lingxingTest.json();
-          
+
           if (lingxingData.success || lingxingData.mock) {
             document.getElementById('lingxingStatus').style.background = 'var(--success)';
             document.getElementById('amazonStatus').style.background = 'var(--text-secondary)';
-            document.getElementById('dataSourceLabel').textContent = '✓ 领星 ERP (Mock模式)';
+            document.getElementById('dataSourceLabel').textContent = '✓ 领星 ERP';
             document.getElementById('dataSourceLabel').style.color = 'var(--success)';
           }
         } catch (e) {
@@ -1355,34 +1337,44 @@
           document.getElementById('dataSourceLabel').textContent = '领星未连接';
         }
 
-        // 获取报告数据 - 从领星同步数据
+        // 获取报告数据 - 从领星同步数据（overview接口），支持按店铺筛选
         try {
-          const overviewRes = await fetch(`${API_BASE}/lingxing/overview`);
+          const params = new URLSearchParams();
+          if (currentStoreId) params.set('storeId', currentStoreId);
+          const overviewRes = await fetch(`${API_BASE}/lingxing/overview?${params}`);
           const overviewData = await overviewRes.json();
           
           if (overviewData.success && overviewData.data) {
             const data = overviewData.data;
-            document.getElementById('totalSpend').textContent = `$${(data.cost || 0).toFixed(2)}`;
-            document.getElementById('totalSales').textContent = `$${(data.sales || 0).toFixed(2)}`;
-            document.getElementById('totalAcos').textContent = `${data.acos || 0}%`;
-            document.getElementById('totalCampaigns').textContent = data.campaigns || 0;
+            // 字段映射：后端返回 totalCost/totalSales/acos/campaignCount
+            const cost = data.totalCost || data.cost || 0;
+            const sales = data.totalSales || data.sales || 0;
+            const acos = data.acos || 0;
+            const campaigns = data.campaignCount || data.campaigns || 0;
+            
+            document.getElementById('totalSpend').textContent = `¥${cost.toLocaleString()}`;
+            document.getElementById('totalSales').textContent = `¥${sales.toLocaleString()}`;
+            document.getElementById('totalAcos').textContent = `${acos.toFixed(1)}%`;
+            document.getElementById('totalCampaigns').textContent = campaigns;
 
             // TACOS 计算（如果有自然销售数据）
-            const adSpend = data.cost || 0;
-            const adSales = data.sales || 0;
             const naturalSales = data.naturalSales || 0;
-            const totalSalesAll = adSales + naturalSales;
+            const totalSalesAll = sales + naturalSales;
             if (totalSalesAll > 0) {
-              const tacos = (adSpend / totalSalesAll) * 100;
+              const tacos = (cost / totalSalesAll) * 100;
               document.getElementById('totalTacos').textContent = `${tacos.toFixed(2)}%`;
               const verdict = tacos <= 5 ? '极优秀' : tacos <= 10 ? '优秀' : tacos <= 20 ? '良好' : tacos <= 30 ? '需优化' : '严重超标';
               const color = tacos <= 5 ? 'var(--success)' : tacos <= 20 ? 'var(--warning)' : 'var(--danger)';
               document.getElementById('tacosStatus').textContent = verdict;
               document.getElementById('tacosStatus').style.color = color;
             }
+            
+            // 更新数据源标签
+            document.getElementById('dataSourceLabel').textContent = '✓ 领星 ERP';
+            document.getElementById('dataSourceLabel').style.color = 'var(--success)';
           }
         } catch (e) {
-          console.log('领星数据获取失败，使用默认值');
+          console.log('领星overview数据获取失败，使用默认值');
         }
 
         // 获取建议
@@ -1401,8 +1393,52 @@
         if (autoData.data?.schedulerActive) {
           document.getElementById('autopilotToggle').classList.add('active');
         }
+
+        // 加载自动驾驶广告组合列表（从真实数据）
+        loadAutopilotTargets();
       } catch (error) {
         console.error('加载数据失败:', error);
+      }
+    }
+
+    // 加载自动驾驶广告组合（从 lingxing portfolios 真实数据）
+    async function loadAutopilotTargets() {
+      const container = document.getElementById('portfolioTargets');
+      if (!container) return;
+
+      try {
+        const params = new URLSearchParams();
+        if (currentStoreId) params.set('storeId', currentStoreId);
+        const res = await fetch(`${API_BASE}/lingxing/portfolios?${params}`);
+        const data = await res.json();
+
+        if (data.success && data.data && data.data.length > 0) {
+          // 按 cost 降序，取前5个
+          const top5 = [...data.data].sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 5);
+          container.innerHTML = top5.map(c => {
+            const acos = c.acos || 0;
+            const color = acos <= 20 ? 'var(--success)' : acos <= 30 ? 'var(--warning)' : 'var(--danger)';
+            const name = c.campaign_name || c.campaign_id || '未命名';
+            const costStr = `¥${(c.cost || 0).toLocaleString()}`;
+            return `
+              <div class="portfolio-item">
+                <div class="portfolio-info">
+                  <h4>${escHtml(name)}</h4>
+                  <span>花费: ${costStr} | 目标 ACOS: 25%</span>
+                </div>
+                <div class="portfolio-acos">
+                  <div class="current" style="color:${color};">${acos.toFixed(1)}%</div>
+                  <div class="target">当前 ACOS</div>
+                </div>
+              </div>`;
+          }).join('');
+          return;
+        }
+
+        // 无数据时显示空状态
+        container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">暂无广告活动数据</div>';
+      } catch (e) {
+        container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">加载失败</div>';
       }
     }
 
@@ -1691,6 +1727,7 @@
     });
 
     // 初始化
+    loadDashboardStores();
     loadDashboardData();
     loadAIConfig(); // 加载 AI 配置并更新模型名称
     loadChartData(); // 加载趋势图表

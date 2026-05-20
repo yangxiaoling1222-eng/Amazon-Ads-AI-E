@@ -1218,10 +1218,7 @@
           <label>店铺筛选：</label>
           <select id="storeFilter" onchange="onStoreChange()">
             <option value="">全部店铺</option>
-            <option value="store_us">美国站 - Amazon.com</option>
-            <option value="store_uk">英国站 - Amazon.co.uk</option>
-            <option value="store_de">德国站 - Amazon.de</option>
-            <option value="store_jp">日本站 - Amazon.co.jp</option>
+            <!-- 从 /api/lingxing/stores 动态加载 -->
           </select>
         </div>
         <div class="filter-group">
@@ -1309,10 +1306,7 @@
             <label>店铺：</label>
             <select id="kw-store-filter" onchange="loadKeywords()">
               <option value="">全部店铺</option>
-              <option value="store_us">🇺🇸 美国站</option>
-              <option value="store_uk">🇬🇧 英国站</option>
-              <option value="store_de">🇩🇪 德国站</option>
-              <option value="store_jp">🇯🇵 日本站</option>
+              <!-- 从 /api/lingxing/stores 动态加载 -->
             </select>
           </div>
           <div class="filter-group">
@@ -1795,6 +1789,8 @@
     // 初始化
     document.addEventListener('DOMContentLoaded', () => {
       initDates();
+      loadOptimizerStores();  // 从API加载真实店铺到筛选框
+      loadKwStoreFilter();    // 关键词Tab的店铺筛选
       loadPortfolios();
       loadTargets();
       loadKeywordTags();
@@ -1893,6 +1889,44 @@
       });
     }
 
+    // 加载优化目标页面的店铺筛选框（从 /api/lingxing/stores 真实数据）
+    async function loadOptimizerStores() {
+      const select = document.getElementById('storeFilter');
+      if (!select) return;
+      try {
+        const res = await fetch(`${API_BASE}/lingxing/stores`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          select.innerHTML = '<option value="">全部店铺</option>';
+          data.data.forEach(s => {
+            const name = s.store_name || s.name || s.marketplace || s.sid;
+            select.innerHTML += `<option value="${s.id || s.store_id || s.sid}">${name}</option>`;
+          });
+        } else {
+          select.innerHTML = '<option value="">全部店铺</option><option value="" disabled>暂无店铺数据</option>';
+        }
+      } catch (e) {
+        console.log('加载店铺列表失败:', e);
+      }
+    }
+
+    // 加载关键词管理页面的店铺筛选框
+    async function loadKwStoreFilter() {
+      const select = document.getElementById('kw-store-filter');
+      if (!select) return;
+      try {
+        const res = await fetch(`${API_BASE}/lingxing/stores`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          select.innerHTML = '<option value="">全部店铺</option>';
+          data.data.forEach(s => {
+            const name = s.store_name || s.name || s.marketplace || s.sid;
+            select.innerHTML += `<option value="${s.id || s.store_id || s.sid}">${name}</option>`;
+          });
+        }
+      } catch (e) { /* 静默失败 */ }
+    }
+
     // 店铺变更事件
     function onStoreChange() {
       const storeId = document.getElementById('storeFilter').value;
@@ -1911,21 +1945,22 @@
       return stores[storeId] || storeId;
     }
 
-    // 加载目标列表
+    // 加载目标列表（仅从自动化目标表读取，用户需手动"新增目标"添加）
     async function loadTargets() {
       const storeFilter = document.getElementById('storeFilter');
       const startDateInput = document.getElementById('startDate');
       const endDateInput = document.getElementById('endDate');
-      
+
       const storeId = storeFilter ? storeFilter.value : '';
       const startDate = startDateInput ? startDateInput.value : '';
       const endDate = endDateInput ? endDateInput.value : '';
 
       try {
+        // 仅从自动化目标表读取
         const url = `${API_BASE}/automation/targets?storeId=${storeId}&startDate=${startDate}&endDate=${endDate}`;
         const res = await fetch(url);
         const data = await res.json();
-        
+
         if (data.success && data.data && data.data.length > 0) {
           // 使用后端数据
           targets = data.data.map(t => ({
@@ -1949,13 +1984,12 @@
             weeklySpend: t.weekly_spend || 0
           }));
         } else {
-          // 后端没有数据或API失败，使用本地数据
-          targets = getFilteredMockData(storeId, startDate, endDate);
+          // 无数据 → 显示空状态（不 fallback 到其他数据源）
+          targets = [];
         }
       } catch (e) {
         console.error('加载目标失败', e);
-        // 使用筛选后的示例数据（根据店铺和时间筛选）
-        targets = getFilteredMockData(storeId, startDate, endDate);
+        targets = [];
       }
       renderTargets();
       updateStats();
@@ -2070,6 +2104,44 @@
       const diffTime = Math.abs(end - start);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return Math.max(diffDays, 1);
+    }
+
+    // 从领星广告数据构建目标列表（当自动化目标表无数据时的fallback）
+    async function loadTargetsFromLingxing(storeId, startDate, endDate) {
+      try {
+        const params = new URLSearchParams({ storeId, startDate, endDate });
+        const res = await fetch(`/api/lingxing/portfolios?${params}`);
+        const data = await res.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+          return data.data.map((c, i) => {
+            const acos = c.acos || 0;
+            return {
+              id: c.campaign_id || `LX-${i}`,
+              portfolioId: c.campaign_id,
+              portfolioName: c.campaign_name || c.campaign_id,
+              storeId: c.store_id,
+              storeName: c.store_id,
+              ownerId: null,
+              ownerName: null,
+              targetAcos: 25,
+              currentAcos: parseFloat(acos.toFixed(1)),
+              tolerance: 5,
+              status: acos <= 25 ? 'active' : acos <= 35 ? 'warning' : 'error',
+              autoActions: ['bid', 'keyword'],
+              createdAt: new Date().toISOString().slice(0,19).replace('T',' '),
+              dailyBudget: c.budget || 0,
+              maxBidChange: 0.2,
+              minBid: 0.02,
+              actionsCount: Math.round(c.clicks || 0),
+              weeklySpend: parseFloat((c.cost || 0).toFixed(2))
+            };
+          });
+        }
+      } catch(e) { console.warn('lingxing portfolios fallback也失败:', e); }
+      
+      // 最终兜底
+      return getFilteredMockData(storeId, startDate, endDate);
     }
 
     // 渲染目标表格

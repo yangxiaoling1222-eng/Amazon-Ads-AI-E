@@ -58,16 +58,24 @@ router.get('/products', async (req, res) => {
 // 获取广告活动
 router.get('/campaigns', async (req, res) => {
   try {
-    const { storeId, page, pageSize } = req.query;
-    
     const dbCampaigns = db.query('SELECT * FROM sync_campaigns ORDER BY last_sync_at DESC');
     
     if (dbCampaigns.length > 0) {
       res.json({ success: true, data: dbCampaigns, fromDb: true });
     } else {
-      const campaigns = await lingxingService.getCampaigns({ storeId, page, pageSize });
-      saveCampaigns(campaigns);
-      res.json({ success: true, data: campaigns });
+      // 先获取店铺列表，再逐个店铺同步广告活动
+      const stores = await lingxingService.getStores();
+      let allCampaigns = [];
+      for (const store of stores || []) {
+        try {
+          const campaigns = await lingxingService.getCampaigns({ sid: store.sid });
+          allCampaigns = allCampaigns.concat(campaigns || []);
+        } catch (e) {
+          console.warn(`[routes] 店铺 ${store.sid} 广告活动获取失败:`, e.message);
+        }
+      }
+      saveCampaigns(allCampaigns);
+      res.json({ success: true, data: allCampaigns });
     }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -101,33 +109,69 @@ router.post('/sync', async (req, res) => {
   try {
     const { storeId, startDate, endDate } = req.body;
     
-    // 同步所有数据
-    const [stores, products, campaigns, reportData] = await Promise.all([
-      lingxingService.getStores(),
-      lingxingService.getProducts({ storeId }),
-      lingxingService.getCampaigns({ storeId }),
-      lingxingService.getAdReport({ storeId, startDate, endDate })
-    ]);
+    // 获取店铺列表
+    const stores = await lingxingService.getStores();
+    
+    // 逐个店铺同步产品、广告活动、报告
+    let allProducts = [];
+    let allCampaigns = [];
+    let allReports = [];
+    
+    for (const store of stores || []) {
+      try {
+        const [products, campaigns, reportData] = await Promise.all([
+          lingxingService.getProducts({ storeId: store.sid }),
+          lingxingService.getCampaigns({ sid: store.sid }),
+          lingxingService.getAdReport({ storeId: store.sid, startDate, endDate })
+        ]);
+        allProducts = allProducts.concat(products || []);
+        allCampaigns = allCampaigns.concat(campaigns || []);
+        allReports = allReports.concat((reportData.data || reportData) || []);
+      } catch (e) {
+        console.warn(`[sync] 店铺 ${store.sid} 同步失败:`, e.message);
+      }
+    }
     
     // 保存到数据库
     saveStores(stores);
-    saveProducts(products);
-    saveCampaigns(campaigns);
-    saveReports(reportData.data || reportData);
+    saveProducts(allProducts);
+    saveCampaigns(allCampaigns);
+    
+    // 按店铺分组保存报告（带上 store_id）
+    const reportsByStore = {};
+    for (const store of stores || []) {
+      const sid = String(store.sid);
+      if (!reportsByStore[sid]) reportsByStore[sid] = [];
+    }
+    allReports.forEach(r => {
+      const sid = String(r.store_id || r.sid || '');
+      if (sid && !reportsByStore[sid]) reportsByStore[sid] = [];
+      if (sid && reportsByStore[sid]) {
+        reportsByStore[sid].push(r);
+      } else {
+        // 未匹配店铺的报告归入第一个店铺
+        const firstStore = stores?.[0]?.sid;
+        if (firstStore && !reportsByStore[String(firstStore)]) reportsByStore[String(firstStore)] = [];
+        if (firstStore) reportsByStore[String(firstStore)].push(r);
+      }
+    });
+    for (const [sid, reps] of Object.entries(reportsByStore)) {
+      saveReports(reps, sid);
+    }
     
     // 记录同步日志
     db.run(
       'INSERT INTO sync_logs (sync_type, status, message) VALUES (?, ?, ?)',
-      ['full', 'success', `同步完成: ${stores.length}店铺, ${products.length}产品, ${campaigns.length}活动`]
+      ['full', 'success', `同步完成: ${stores.length}店铺, ${allProducts.length}产品, ${allCampaigns.length}活动, ${allReports.length}报告`]
     );
     
     res.json({ 
       success: true, 
       data: {
         stores: stores.length,
-        products: products.length,
-        campaigns: campaigns.length,
-        reports: (reportData.data || reportData).length
+        products: allProducts.length,
+        campaigns: allCampaigns.length,
+        reports: allReports.length
       }
     });
   } catch (error) {
@@ -175,7 +219,8 @@ router.get('/portfolios', async (req, res) => {
     // 优先从数据库读 campaigns
     let campaigns = db.query('SELECT * FROM sync_campaigns ORDER BY campaign_name');
     if (storeId) {
-      campaigns = campaigns.filter(c => c.store_id === storeId);
+      const sid = String(storeId);
+      campaigns = campaigns.filter(c => String(c.store_id || '') === sid);
     }
 
     // 按 campaign_id 聚合报告数据（可按日期范围筛选）
@@ -330,59 +375,174 @@ router.get('/portfolios/:id', async (req, res) => {
   }
 });
 
-// 获取概览统计数据
+// 获取概览统计数据（仪表盘核心指标）
+router.get('/overview', async (req, res) => {
+  try {
+    const { storeId, startDate, endDate } = req.query;
+
+    // 汇总报告数据
+    let reports = db.query('SELECT * FROM sync_reports');
+    if (storeId) {
+      const sid = String(storeId);
+      reports = reports.filter(r => String(r.store_id || '') === sid);
+    }
+    if (startDate) reports = reports.filter(r => r.date >= startDate);
+    if (endDate)   reports = reports.filter(r => r.date <= endDate);
+
+    const summary = reports.reduce((acc, r) => {
+      acc.impressions += r.impressions || 0;
+      acc.clicks       += r.clicks       || 0;
+      acc.cost         += r.cost         || 0;
+      acc.sales        += r.sales        || 0;
+      acc.orders       += r.orders       || 0;
+      return acc;
+    }, { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 });
+
+    // 活动数量
+    let campaigns = db.query('SELECT * FROM sync_campaigns');
+    if (storeId) {
+      const sid = String(storeId);
+      campaigns = campaigns.filter(c => String(c.store_id || '') === sid);
+    }
+
+    // 店铺数量
+    const stores = db.query('SELECT * FROM sync_stores');
+
+    const cost   = parseFloat(summary.cost.toFixed(2));
+    const sales  = parseFloat(summary.sales.toFixed(2));
+    const clicks = summary.clicks;
+    const imp    = summary.impressions;
+
+    res.json({
+      success: true,
+      data: {
+        totalSales:        sales,
+        totalCost:         cost,
+        totalOrders:       summary.orders,
+        acos:              sales > 0 ? parseFloat((cost / sales * 100).toFixed(2)) : 0,
+        roas:              cost > 0 ? parseFloat((sales / cost).toFixed(2)) : 0,
+        impressions:       imp,
+        clicks:            clicks,
+        ctr:               imp > 0 ? parseFloat((clicks / imp * 100).toFixed(2)) : 0,
+        cpc:               clicks > 0 ? parseFloat((cost / clicks).toFixed(2)) : 0,
+        campaignCount:     campaigns.length,
+        storeCount:        stores.length,
+        reportDateRange:   reports.length
+          ? { start: reports[0].date, end: reports[reports.length - 1].date }
+          : null,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 获取趋势数据（按日期分组，用于图表）
+router.get('/trend', async (req, res) => {
+  try {
+    const { storeId, startDate, endDate, days } = req.query;
+    const limit = parseInt(days) || 30;
+
+    let reports = db.query('SELECT * FROM sync_reports ORDER BY date DESC LIMIT ?', [limit * 10]); // 多取一些以防过滤
+    if (storeId) {
+      const sid = String(storeId);
+      reports = reports.filter(r => String(r.store_id || '') === sid);
+    }
+    if (startDate) reports = reports.filter(r => r.date >= startDate);
+    if (endDate)   reports = reports.filter(r => r.date <= endDate);
+
+    // 按日期聚合
+    const byDate = {};
+    reports.forEach(r => {
+      const d = r.date;
+      if (!byDate[d]) {
+        byDate[d] = { date: d, impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 };
+      }
+      byDate[d].impressions += r.impressions || 0;
+      byDate[d].clicks       += r.clicks       || 0;
+      byDate[d].cost         += r.cost         || 0;
+      byDate[d].sales        += r.sales        || 0;
+      byDate[d].orders       += r.orders       || 0;
+    });
+
+    // 按日期排序，取最近 N 天
+    let trend = Object.values(byDate)
+      .map(d => ({
+        ...d,
+        cost:  parseFloat(d.cost.toFixed(2)),
+        sales: parseFloat(d.sales.toFixed(2)),
+        ctr:   d.impressions > 0 ? parseFloat((d.clicks / d.impressions * 100).toFixed(2)) : 0,
+        cpc:   d.clicks > 0 ? parseFloat((d.cost / d.clicks).toFixed(2)) : 0,
+        acos:  d.sales > 0 ? parseFloat((d.cost / d.sales * 100).toFixed(2)) : 0,
+        roas:  d.cost > 0 ? parseFloat((d.sales / d.cost).toFixed(2)) : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // 只返回最近 N 天
+    if (trend.length > limit) {
+      trend = trend.slice(trend.length - limit);
+    }
+
+    res.json({ success: true, data: trend, total: trend.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // 保存店铺数据
 function saveStores(stores) {
   if (!stores || stores.length === 0) return;
-  
   for (const store of stores) {
     db.run(`
       INSERT OR REPLACE INTO sync_stores 
       (store_id, store_name, marketplace, region, status, last_sync_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `, [store.store_id, store.store_name, store.marketplace, store.region, store.status]);
+    `, [store.sid, store.name, store.country, store.region, store.status]);
   }
 }
 
-// 保存产品数据
 function saveProducts(products) {
   if (!products || products.length === 0) return;
-  
   for (const product of products) {
     db.run(`
       INSERT OR REPLACE INTO sync_products 
       (sku_id, sku, asin, name, img, status, store_id, last_sync_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `, [product.sku_id, product.sku, product.asin, product.name, product.img, product.status, product.store_id]);
+    `, [product.id || product.sku_id || 0, product.sku || '', product.asin || null, product.product_name || product.name || '', product.pic_url || null, product.status || 1, product.cid || null]);
   }
 }
 
-// 保存广告活动数据
 function saveCampaigns(campaigns) {
   if (!campaigns || campaigns.length === 0) return;
-  
   for (const campaign of campaigns) {
     db.run(`
       INSERT OR REPLACE INTO sync_campaigns 
       (campaign_id, campaign_name, type, status, budget, store_id, last_sync_at)
       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `, [campaign.campaign_id, campaign.campaign_name, campaign.type, campaign.status, campaign.budget, campaign.store_id]);
+    `, [campaign.campaign_id, campaign.name || '', campaign.campaign_type || 'unknown', campaign.state || 'enabled', campaign.daily_budget || 0, campaign.sid || null]);
   }
 }
 
-// 保存报告数据
-function saveReports(reports) {
+function saveReports(reports, storeId) {
   if (!reports || reports.length === 0) return;
-  
   for (const report of reports) {
     db.run(`
       INSERT OR REPLACE INTO sync_reports 
-      (date, campaign_id, impressions, clicks, cost, sales, orders, ctr, cpc, acos, roas, last_sync_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      (date, campaign_id, store_id, impressions, clicks, cost, sales, orders, ctr, cpc, acos, roas, last_sync_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `, [
-      report.date, report.campaign_id, report.impressions, report.clicks, 
-      report.cost, report.sales, report.orders, report.ctr, report.cpc, report.acos, report.roas
+      report.report_date || report.date || new Date().toISOString().slice(0,10),
+      report.campaign_id || null,
+      storeId || report.store_id || null,
+      report.impressions || 0,
+      report.clicks || 0,
+      report.cost || 0,
+      report.sales || 0,
+      report.orders || 0,
+      report.ctr || 0,
+      report.cpc || 0,
+      report.acos || 0,
+      report.roas || 0
     ]);
   }
 }

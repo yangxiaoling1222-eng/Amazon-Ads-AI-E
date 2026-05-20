@@ -187,6 +187,7 @@ function createTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT,
       campaign_id TEXT,
+      store_id TEXT,
       impressions INTEGER,
       clicks INTEGER,
       cost REAL,
@@ -199,6 +200,8 @@ function createTables() {
       last_sync_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // 兼容已有数据库：添加 store_id 列（如果不存在）
+  try { db.run("ALTER TABLE sync_reports ADD COLUMN store_id TEXT"); } catch(e) {}
 
   // 同步日志表
   db.run(`

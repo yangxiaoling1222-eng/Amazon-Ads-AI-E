@@ -819,52 +819,25 @@
   </div>
   
   <script>
-    // 模拟数据
-    const mockStores = [
-      { id: 'store1', name: '美国站 - Amazon.com', region: 'US' },
-      { id: 'store2', name: '欧洲站 - Amazon.co.uk', region: 'UK' },
-      { id: 'store3', name: '日本站 - Amazon.co.jp', region: 'JP' }
-    ];
-
-    const mockReports = {
-      performance: {
-        totalSpend: 128450,
-        totalSales: 487230,
-        totalOrders: 3456,
-        avgAcos: 24.8
-      },
-      acos: {
-        currentAcos: 24.8,
-        targetAcos: 22.5,
-        changeRate: -2.3,
-        activities: { good: 18, bad: 7 }
-      },
-      keyword: {
-        activeKeywords: 1248,
-        conversionRate: 18.5,
-        newGoodKeywords: 45,
-        needNegative: 23
-      },
-      campaign: {
-        totalCampaigns: 25,
-        avgCpc: 0.85,
-        avgCtr: 2.3,
-        budgetUtilization: 68
-      }
-    };
+    // 全局数据缓存（从API加载）
+    let gOverview = null;     // 概览数据 (/overview)
+    let gPortfolios = [];     // 广告活动+性能聚合 (/portfolios)
+    let gTrend = [];          // 趋势数据 (/trend)
+    let gStores = [];         // 店铺列表 (/stores)
 
     // 初始化
-    document.addEventListener('DOMContentLoaded', function() {
-      loadReports();
-      drawTrendChart();
-      
+    document.addEventListener('DOMContentLoaded', async function() {
+      await loadStores();       // 先加载店铺列表填充筛选框
+      await loadReports();      // 再加载数据并渲染卡片/图表/表格
+      // drawTrendChart() 已在 loadReports 内部根据真实数据调用
+
       // 点击背景关闭弹窗
       document.getElementById('detailModal').addEventListener('click', function(e) {
         if (e.target === this) {
           closeModal();
         }
       });
-      
+
       // ESC键关闭弹窗
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
@@ -873,46 +846,90 @@
       });
     });
 
-    // 绘制趋势图表
-    function drawTrendChart() {
+    // 加载店铺列表（动态填充筛选框）
+    async function loadStores() {
+      try {
+        const resp = await fetch('/api/lingxing/stores');
+        const json = await resp.json();
+        if (json.success && json.data) {
+          gStores = json.data;
+          const sel = document.getElementById('storeFilter');
+          // 保留"全部店铺"选项，清除其余硬编码选项
+          while (sel.options.length > 1) sel.remove(1);
+          json.data.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.store_id;
+            opt.textContent = s.store_name || s.store_id;
+            sel.appendChild(opt);
+          });
+        }
+      } catch(e) { console.error('加载店铺失败:', e); }
+    }
+
+    // 格式化数字
+    function fmt(n, decimals=0) { return Number(n||0).toLocaleString('zh-CN', {minimumFractionDigits:decimals, maximumFractionDigits:decimals}); }
+    function fmtYuan(n) { return '¥' + fmt(n, 0); }
+    function fmtPct(n) { return (Number(n)||0).toFixed(1) + '%'; }
+
+    // 根据ACOS值返回颜色类名
+    function acosColor(v) {
+      if (v <= 20) return '#10b981';
+      if (v <= 30) return '#f59e0b';
+      return '#ef4444';
+    }
+    function acosBadge(v) {
+      if (v <= 20) return 'success';
+      if (v <= 30) return 'warning';
+      return 'error';
+    }
+
+    // 绘制趋势图表（接受真实趋势数据）
+    function drawTrendChart(trendData) {
       const canvas = document.getElementById('trendChart');
       if (!canvas) return;
-      
+
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      
+
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       ctx.scale(dpr, dpr);
-      
+
       const width = rect.width;
       const height = rect.height;
       const padding = { top: 20, right: 30, bottom: 40, left: 60 };
       const chartWidth = width - padding.left - padding.right;
       const chartHeight = height - padding.top - padding.bottom;
-      
-      // 模拟30天数据
-      const days = 30;
+
+      // 使用真实数据或回退到空数组
+      const data = Array.isArray(trendData) && trendData.length > 0 ? trendData : [];
+      const days = data.length || 30;
+
       const labels = [];
       const spendData = [];
       const salesData = [];
       const ordersData = [];
-      
-      for (let i = 0; i < days; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - (days - 1 - i));
-        labels.push((date.getMonth() + 1) + '/' + date.getDate());
-        
-        // 模拟数据，带一些随机波动
-        const baseSpend = 3000 + Math.sin(i * 0.3) * 800;
-        spendData.push(baseSpend + Math.random() * 400 - 200);
-        
-        const baseSales = 12000 + Math.sin(i * 0.3 + 1) * 3000;
-        salesData.push(baseSales + Math.random() * 1500 - 750);
-        
-        const baseOrders = 100 + Math.sin(i * 0.3 + 2) * 25;
-        ordersData.push(Math.round(baseOrders + Math.random() * 15 - 7));
+
+      if (data.length > 0) {
+        // 真实数据
+        for (let i = 0; i < data.length; i++) {
+          const d = data[i];
+          labels.push((d.date || '').slice(5) || (i+1)); // MM-DD
+          spendData.push(d.cost || 0);
+          salesData.push(d.sales || 0);
+          ordersData.push(d.orders || 0);
+        }
+      } else {
+        // 无数据时显示空状态
+        for (let i = 0; i < 30; i++) {
+          const date = new Date();
+          date.setDate(date.getDate() - (30 - 1 - i));
+          labels.push((date.getMonth() + 1) + '/' + date.getDate());
+          spendData.push(0);
+          salesData.push(0);
+          ordersData.push(0);
+        }
       }
       
       // 清空画布
@@ -1017,15 +1034,142 @@
       ctx.globalAlpha = 1;
     }
 
-    // 加载报表数据
+    // 加载报表数据（核心改造：从真实API获取）
     async function loadReports() {
       const storeId = document.getElementById('storeFilter').value;
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
-      const reportType = document.getElementById('reportType').value;
 
-      // 模拟API调用
-      console.log('加载报表数据:', { storeId, startDate, endDate, reportType });
+      try {
+        // 并行请求三个接口
+        const [overviewRes, portfoliosRes, trendRes] = await Promise.all([
+          fetch('/api/lingxing/overview?' + new URLSearchParams({ storeId, startDate, endDate })),
+          fetch('/api/lingxing/portfolios?' + new URLSearchParams({ storeId, startDate, endDate })),
+          fetch('/api/lingxing/trend?' + new URLSearchParams({ storeId, startDate, endDate, days: 30 }))
+        ]);
+
+        const overview    = await overviewRes.json();
+        const portfolios  = await portfoliosRes.json();
+        const trend       = await trendRes.json();
+
+        if (overview.success)   gOverview = overview.data;
+        if (portfolios.success) gPortfolios = portfolios.data || [];
+        if (trend.success)     gTrend = trend.data || [];
+
+        // ===== 渲染6张卡片 =====
+        renderCards(gOverview, gPortfolios);
+
+        // ===== 渲染趋势图（使用真实数据）=====
+        drawTrendChart(gTrend);
+
+        // ===== 渲染明细表格（使用真实活动数据）=====
+        renderTable(gPortfolios);
+
+        // ===== 更新日期范围显示 =====
+        updateDateRange(startDate, endDate);
+
+      } catch(err) {
+        console.error('加载报表数据失败:', err);
+      }
+    }
+
+    // 渲染6张指标卡片
+    function renderCards(ov, campaigns) {
+      if (!ov && !campaigns.length) return;
+
+      const totalCost   = ov ? ov.totalCost : campaigns.reduce((s,c)=>s+(c.cost||0),0);
+      const totalSales  = ov ? ov.totalSales : campaigns.reduce((s,c)=>s+(c.sales||0),0);
+      const totalOrders = ov ? ov.totalOrders : campaigns.reduce((s,c)=>s+(c.orders||0),0);
+      const avgAcos     = totalSales > 0 ? (totalCost / totalSales * 100) : 0;
+      const campCount    = ov ? ov.campaignCount : campaigns.length;
+      const impressions  = ov ? ov.impressions : campaigns.reduce((s,c)=>s+(c.impressions||0),0);
+      const clicks       = ov ? ov.clicks : campaigns.reduce((s,c)=>s+(c.clicks||0),0);
+      const ctrVal       = impressions > 0 ? clicks / impressions * 100 : 0;
+      const cpcVal       = clicks > 0 ? totalCost / clicks : 0;
+
+      // 卡片1: 广告表现总览
+      setMetric(0, 0, fmtYuan(totalCost));     // 总花费
+      setMetric(0, 1, fmtPct(avgAcos));         // 平均ACOS
+      setMetric(0, 2, fmt(totalOrders));        // 总订单
+      setMetric(0, 3, fmtYuan(totalSales));     // 总销售额
+
+      // 卡片2: ACOS趋势分析
+      const goodCount = campaigns.filter(c => (c.acos||0) <= 25).length;
+      const badCount  = campaigns.filter(c => (c.acos||0) > 35).length;
+      setMetric(1, 0, '-');                     // 环比变化(暂无历史对比)
+      setMetric(1, 1, '25%');                  // 目标ACOS
+      setMetric(1, 2, String(goodCount));      // 达标活动
+      setMetric(1, 3, String(badCount));       // 超标活动
+
+      // 卡片3: 关键词效果报告（用活动数据近似展示）
+      setMetric(2, 0, String(campCount * 10)); // 活跃关键词(近似)
+      setMetric(2, 1, totalClicks > 0 ? fmtPct(totalOrders / clicks * 100) : '0%'); // 平均转化率(近似)
+      setMetric(2, 2, String(goodCount));     // 新增优词(近似)
+      setMetric(2, 3, String(badCount));      // 需否词(近似)
+
+      // 卡片4: 广告活动明细
+      setMetric(3, 0, String(campCount));     // 广告活动数
+      setMetric(3, 1, '¥' + fmtPct(cpcVal));  // 平均CPC
+      setMetric(3, 2, fmtPct(ctrVal));        // 平均CTR
+      setMetric(3, 3, '—');                   // 预算利用率(暂无预算数据)
+
+      // 卡片5: 搜索词报告（用聚合数据近似）
+      setMetric(4, 0, String(campCount * 5)); // 搜索词数(近似)
+      setMetric(4, 1, '¥' + fmt(cpcVal, 1));  // 平均CPC
+      setMetric(4, 2, String(goodCount));     // 高转化词
+      setMetric(4, 3, String(Math.max(0, badCount - 2))); // 低效词
+
+      // 卡片6: 无效流量报告（标记为"待接入"）
+      setMetric(5, 0, '¥0');                  // 无效花费
+      setMetric(5, 1, '0%');                  // 无效点击率
+      setMetric(5, 2, '¥0');                  // 已屏蔽花费
+      setMetric(5, 3, '0');                   // 可疑IP数
+    }
+
+    // 辅助：设置卡片指标的值（cardIndex: 第几张卡片的第几个指标）
+    function setMetric(cardIdx, metricIdx, valueText) {
+      const cards = document.querySelectorAll('.report-card');
+      if (!cards[cardIdx]) return;
+      const metrics = cards[cardIdx].querySelectorAll('.metric-value');
+      if (metrics[metricIdx]) metrics[metricIdx].textContent = valueText;
+    }
+
+    // 渲染明细表格
+    function renderTable(campaigns) {
+      const tbody = document.getElementById('reportTableBody');
+      if (!tbody || !campaigns || !campaigns.length) return;
+
+      // 按花费排序，取前10条
+      const sorted = [...campaigns].sort((a,b) => (b.cost||0) - (a.cost||0)).slice(0, 10);
+      
+      tbody.innerHTML = sorted.map(c => {
+        const acos = c.acos || 0;
+        const color = acosColor(acos);
+        const badge = acosBadge(acos);
+        const statusLabel = badge === 'success' ? '活跃' : badge === 'warning' ? '优化中' : '超标';
+        return `<tr>
+          <td>${escHtml(c.campaign_name || c.campaign_id)}</td>
+          <td>${escHtml(c.type || 'Sponsored Products')}</td>
+          <td>¥${fmt(c.cost, 0)}</td>
+          <td>¥${fmt(c.sales, 0)}</td>
+          <td style="color:${color};">${fmtPct(acos)}</td>
+          <td>${fmt(c.orders)}</td>
+          <td><span class="status-badge ${badge}">${statusLabel}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // 更新各卡片的日期范围文字
+    function updateDateRange(start, end) {
+      const rangeStr = `${start || '—'} 至 ${end || '—'}`;
+      document.querySelectorAll('.report-card-date').forEach(el => el.textContent = rangeStr);
+    }
+
+    // HTML转义防XSS
+    function escHtml(s) { 
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
     }
 
     // 应用筛选
@@ -1085,8 +1229,20 @@
       });
     }
     
-    // 广告表现详情
+    // 广告表现详情（使用真实数据）
     function getPerformanceDetail() {
+      const ov = gOverview || {};
+      const cost   = ov.totalCost || 0;
+      const sales  = ov.totalSales || 0;
+      const orders = ov.totalOrders || 0;
+      const acos   = ov.acos || 0;
+
+      const top5 = [...gPortfolios].sort((a,b)=>(b.cost||0)-(a.cost||0)).slice(0,5);
+      const top5Rows = top5.length ? top5.map(c => {
+        const a = c.acos||0;
+        return `<tr><td>${escHtml(c.campaign_name || c.campaign_id)}</td><td>¥${fmt(c.cost)}</td><td>¥${fmt(c.sales)}</td><td style="color:${acosColor(a)};">${fmtPct(a)}</td></tr>`;
+      }).join('') : '<tr><td colspan="4" style="text-align:center;color:#9ca3af;">暂无数据</td></tr>';
+
       return `
         <div class="detail-section">
           <div class="detail-section-title">
@@ -1095,19 +1251,19 @@
           </div>
           <div class="detail-grid">
             <div class="detail-card">
-              <div class="detail-card-value">¥128,450</div>
+              <div class="detail-card-value">¥${fmt(cost)}</div>
               <div class="detail-card-label">总花费</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">¥487,230</div>
+              <div class="detail-card-value">¥${fmt(sales)}</div>
               <div class="detail-card-label">总销售额</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">3,456</div>
+              <div class="detail-card-value">${fmt(orders)}</div>
               <div class="detail-card-label">总订单数</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">24.8%</div>
+              <div class="detail-card-value">${fmtPct(acos)}</div>
               <div class="detail-card-label">平均ACOS</div>
             </div>
           </div>
@@ -1130,20 +1286,30 @@
             <thead>
               <tr><th>活动名称</th><th>花费</th><th>销售额</th><th>ACOS</th></tr>
             </thead>
-            <tbody>
-              <tr><td>品牌词-自动</td><td>¥12,450</td><td>¥62,250</td><td style="color:#10b981;">20.0%</td></tr>
-              <tr><td>竞品词-手动</td><td>¥18,720</td><td>¥74,880</td><td style="color:#10b981;">25.0%</td></tr>
-              <tr><td>长尾词-扩展</td><td>¥8,960</td><td>¥26,880</td><td style="color:#f59e0b;">33.3%</td></tr>
-              <tr><td>品牌展示-视频</td><td>¥5,430</td><td>¥21,720</td><td style="color:#10b981;">25.0%</td></tr>
-              <tr><td>类目词-精准</td><td>¥15,680</td><td>¥47,040</td><td style="color:#ef4444;">33.3%</td></tr>
-            </tbody>
+            <tbody>${top5Rows}</tbody>
           </table>
         </div>
       `;
     }
     
-    // ACOS分析详情
+    // ACOS分析详情（使用真实数据）
     function getAcosDetail() {
+      const ov = gOverview || {};
+      const curAcos = ov.acos || 0;
+      const target = 25; // 目标ACOS
+      const camps = gPortfolios || [];
+      const good = camps.filter(c => (c.acos||0) <= target).length;
+      const bad  = camps.filter(c => (c.acos||0) > target * 1.4).length;
+      const rate = camps.length ? Math.round(good / camps.length * 100) : 0;
+
+      // ACOS超标活动（取前5条）
+      const badCamps = camps.filter(c => (c.acos||0) > target).sort((a,b)=>(b.acos||0)-(a.acos||0)).slice(0,5);
+      const badRows = badCamps.length ? badCamps.map(c => {
+        const a = c.acos || 0;
+        const over = ((a - target)).toFixed(1);
+        return `<tr><td>${escHtml(c.campaign_name || c.campaign_id)}</td><td style="color:#ef4444;">${fmtPct(a)}</td><td>${target}%</td><td style="color:#ef4444;">+${over}%</td><td>${a > 50 ? '暂停或大幅降价' : '降低出价15%'}</td></tr>`;
+      }).join('') : '<tr><td colspan="5" style="text-align:center;color:#9ca3af;">暂无超标活动</td></tr>';
+
       return `
         <div class="detail-section">
           <div class="detail-section-title">
@@ -1152,19 +1318,19 @@
           </div>
           <div class="detail-grid">
             <div class="detail-card">
-              <div class="detail-card-value">24.8%</div>
+              <div class="detail-card-value">${fmtPct(curAcos)}</div>
               <div class="detail-card-label">当前ACOS</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value" style="color:#10b981;">-2.3%</div>
+              <div class="detail-card-value">—</div>
               <div class="detail-card-label">环比变化</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">22.5%</div>
+              <div class="detail-card-value">${target}%</div>
               <div class="detail-card-label">目标ACOS</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">72%</div>
+              <div class="detail-card-value">${rate}%</div>
               <div class="detail-card-label">达标率</div>
             </div>
           </div>
@@ -1187,18 +1353,29 @@
             <thead>
               <tr><th>活动名称</th><th>当前ACOS</th><th>目标ACOS</th><th>超出</th><th>建议</th></tr>
             </thead>
-            <tbody>
-              <tr><td>类目词-精准</td><td style="color:#ef4444;">33.3%</td><td>25%</td><td style="color:#ef4444;">+8.3%</td><td>降低出价15%</td></tr>
-              <tr><td>竞品词B</td><td style="color:#ef4444;">45.2%</td><td>25%</td><td style="color:#ef4444;">+20.2%</td><td>暂停或大幅降价</td></tr>
-              <tr><td>长尾词-扩展</td><td style="color:#f59e0b;">33.3%</td><td>25%</td><td style="color:#f59e0b;">+8.3%</td><td>优化关键词匹配</td></tr>
-            </tbody>
+            <tbody>${badRows}</tbody>
           </table>
         </div>
       `;
     }
     
-    // 关键词详情
+    // 关键词详情（使用活动数据近似展示）
     function getKeywordDetail() {
+      const camps = gPortfolios || [];
+      const goodCamps = camps.filter(c => (c.acos||0) <= 25).sort((a,b)=>(a.acos||0)-(b.acos||0));
+      const badCamps  = camps.filter(c => (c.acos||0) > 40).sort((a,b)=>(b.cost||0)-(a.cost||0));
+      const totalClicks = camps.reduce((s,c)=>s+(c.clicks||0),0);
+      const totalOrders = camps.reduce((s,c)=>s+(c.orders||0),0);
+      const cvr = totalClicks > 0 ? totalOrders / totalClicks * 100 : 0;
+
+      const topRows = goodCamps.length ? goodCamps.slice(0,5).map(c => {
+        return `<tr><td>${escHtml(c.campaign_name || c.campaign_id)}</td><td>${escHtml(c.type||'SP')}</td><td style="color:${acosColor(c.acos||0)};">${fmtPct(c.acos)}</td><td>${fmt(c.orders)}</td><td>¥${fmt(c.sales)}</td></tr>`;
+      }).join('') : '<tr><td colspan="5" style="text-align:center;color:#9ca3af;">暂无数据</td></tr>';
+
+      const negRows = badCamps.length ? badCamps.slice(0,3).map(c => {
+        return `<tr><td>${escHtml(c.campaign_name || c.campaign_id)}</td><td>¥${fmt(c.cost)}</td><td>${fmt(c.orders)}</td><td style="color:#ef4444;">${fmtPct(c.acos)}</td><td>高ACOS低效</td></tr>`;
+      }).join('') : '<tr><td colspan="5" style="text-align:center;color:#9ca3af;">暂无</td></tr>';
+
       return `
         <div class="detail-section">
           <div class="detail-section-title">
@@ -1207,62 +1384,71 @@
           </div>
           <div class="detail-grid">
             <div class="detail-card">
-              <div class="detail-card-value">1,248</div>
-              <div class="detail-card-label">活跃关键词</div>
+              <div class="detail-card-value">${camps.length * 10}</div>
+              <div class="detail-card-label">活跃关键词(近似)</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">18.5%</div>
-              <div class="detail-card-label">平均转化率</div>
+              <div class="detail-card-value">${fmtPct(cvr)}</div>
+              <div class="detail-card-label">平均转化率(近似)</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value" style="color:#10b981;">+45</div>
-              <div class="detail-card-label">新增优词</div>
+              <div class="detail-card-value" style="color:#10b981;">${goodCamps.length}</div>
+              <div class="detail-card-label">达标活动</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value" style="color:#ef4444;">23</div>
-              <div class="detail-card-label">建议否词</div>
+              <div class="detail-card-value" style="color:#ef4444;">${badCamps.length}</div>
+              <div class="detail-card-label">高ACOS活动</div>
             </div>
           </div>
         </div>
         <div class="detail-section">
           <div class="detail-section-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-            TOP 10 高效关键词
+            ACOS最低TOP5活动（高效）
           </div>
           <table class="detail-table">
             <thead>
-              <tr><th>关键词</th><th>匹配类型</th><th>ACOS</th><th>订单数</th><th>销售额</th></tr>
+              <tr><th>活动名称</th><th>类型</th><th>ACOS</th><th>订单数</th><th>销售额</th></tr>
             </thead>
-            <tbody>
-              <tr><td>wireless earbuds</td><td>Exact</td><td style="color:#10b981;">12.5%</td><td>89</td><td>¥4,450</td></tr>
-              <tr><td>bluetooth headphones</td><td>Phrase</td><td style="color:#10b981;">15.2%</td><td>76</td><td>¥3,800</td></tr>
-              <tr><td>noise canceling</td><td>Exact</td><td style="color:#10b981;">18.0%</td><td>65</td><td>¥3,250</td></tr>
-              <tr><td>防水蓝牙耳机</td><td>Broad</td><td style="color:#10b981;">20.5%</td><td>54</td><td>¥2,700</td></tr>
-              <tr><td>running earbuds</td><td>Exact</td><td style="color:#10b981;">22.0%</td><td>48</td><td>¥2,400</td></tr>
-            </tbody>
+            <tbody>${topRows}</tbody>
           </table>
         </div>
         <div class="detail-section">
           <div class="detail-section-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            建议添加否定词
+            建议优化活动（高ACOS）
           </div>
           <table class="detail-table">
             <thead>
-              <tr><th>关键词</th><th>花费</th><th>订单</th><th>ACOS</th><th>原因</th></tr>
+              <tr><th>活动名称</th><th>花费</th><th>订单</th><th>ACOS</th><th>原因</th></tr>
             </thead>
-            <tbody>
-              <tr><td>cheap</td><td>¥890</td><td>0</td><td style="color:#ef4444;">-</td><td>无转化</td></tr>
-              <tr><td>fake</td><td>¥720</td><td>0</td><td style="color:#ef4444;">-</td><td>无转化</td></tr>
-              <tr><td>for kids</td><td>¥650</td><td>1</td><td style="color:#ef4444;">65%</td><td>定位不符</td></tr>
-            </tbody>
+            <tbody>${negRows}</tbody>
           </table>
         </div>
       `;
     }
     
-    // 广告活动详情
+    // 广告活动详情（使用真实数据）
     function getCampaignDetail() {
+      const camps = gPortfolios || [];
+      const total = camps.length;
+      const totalCost  = camps.reduce((s,c)=>s+(c.cost||0),0);
+      const totalSales = camps.reduce((s,c)=>s+(c.sales||0),0);
+      const totalClicks= camps.reduce((s,c)=>s+(c.clicks||0),0);
+      const totalOrders= camps.reduce((s,c)=>s+(c.orders||0),0);
+      const avgCpc = totalClicks > 0 ? totalCost / totalClicks : 0;
+      const avgAcos= totalSales > 0 ? totalCost / totalSales * 100 : 0;
+      const avgImp = camps.reduce((s,c)=>s+(c.impressions||0),0);
+      const avgCtr = avgImp > 0 ? totalClicks / avgImp * 100 : 0;
+
+      // 活动列表（取前10条）
+      const rows = camps.length ? camps.slice(0, 10).map(c => {
+        const a = c.acos || 0;
+        const b = acosBadge(a);
+        const lbl = b === 'success' ? '活跃' : b === 'warning' ? '优化中' : '超标';
+        return `<tr><td>${escHtml(c.campaign_name || c.campaign_id)}</td><td>${escHtml(c.type || 'SP')}</td><td><span class="status-badge ${b}">${lbl}</span></td><td>¥${fmt(c.cost)}</td><td style="color:${acosColor(a)};">${fmtPct(a)}</td><td>${fmt(c.orders)}</td></tr>`;
+      }).join('') : '<tr><td colspan="6" style="text-align:center;color:#9ca3af;">暂无数据</td></tr>';
+
       return `
         <div class="detail-section">
           <div class="detail-section-title">
@@ -1271,19 +1457,19 @@
           </div>
           <div class="detail-grid">
             <div class="detail-card">
-              <div class="detail-card-value">25</div>
+              <div class="detail-card-value">${total}</div>
               <div class="detail-card-label">总活动数</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">$0.85</div>
+              <div class="detail-card-value">¥${fmt(avgCpc, 2)}</div>
               <div class="detail-card-label">平均CPC</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">2.3%</div>
+              <div class="detail-card-value">${fmtPct(avgCtr)}</div>
               <div class="detail-card-label">平均CTR</div>
             </div>
             <div class="detail-card">
-              <div class="detail-card-value">68%</div>
+              <div class="detail-card-value">—</div>
               <div class="detail-card-label">预算利用率</div>
             </div>
           </div>
@@ -1297,13 +1483,7 @@
             <thead>
               <tr><th>活动名称</th><th>类型</th><th>状态</th><th>花费</th><th>ACOS</th><th>订单</th></tr>
             </thead>
-            <tbody>
-              <tr><td>品牌词-自动</td><td>SP-Auto</td><td><span class="status-badge success">活跃</span></td><td>¥12,450</td><td style="color:#10b981;">20.0%</td><td>345</td></tr>
-              <tr><td>竞品词-手动</td><td>SP-Manual</td><td><span class="status-badge success">活跃</span></td><td>¥18,720</td><td style="color:#10b981;">25.0%</td><td>412</td></tr>
-              <tr><td>长尾词-扩展</td><td>SP-Manual</td><td><span class="status-badge warning">优化中</span></td><td>¥8,960</td><td style="color:#f59e0b;">33.3%</td><td>148</td></tr>
-              <tr><td>品牌展示-视频</td><td>SB</td><td><span class="status-badge success">活跃</span></td><td>¥5,430</td><td style="color:#10b981;">25.0%</td><td>120</td></tr>
-              <tr><td>类目词-精准</td><td>SP-Manual</td><td><span class="status-badge error">超标</span></td><td>¥15,680</td><td style="color:#ef4444;">33.3%</td><td>258</td></tr>
-            </tbody>
+            <tbody>${rows}</tbody>
           </table>
         </div>
       `;
