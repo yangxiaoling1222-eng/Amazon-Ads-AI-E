@@ -2452,143 +2452,174 @@
       }
     }
 
-    // 查看详情
+    // 查看详情（从后端获取真实数据）
     async function viewDetail(id) {
       const target = targets.find(t => t.id === id);
       if (!target) return;
 
       document.getElementById('drawerTitle').textContent = target.portfolioName + ' - 详情';
-      
-      // 示例活动数据
-      const campaigns = [
-        { id: 'C001', name: 'Auto - 广泛匹配', type: '自动', acos: 11.2, spend: 1250, sales: 11160, status: 'active' },
-        { id: 'C002', name: '手动 - 精准匹配 关键词A', type: '手动', acos: 15.8, spend: 890, sales: 5633, status: 'active' },
-        { id: 'C003', name: '手动 - 词组匹配 关键词B', type: '手动', acos: 18.5, spend: 560, sales: 3027, status: 'active' },
-        { id: 'C004', name: '商品投放 - ASIN测试', type: 'SD', acos: 22.3, spend: 320, sales: 1435, status: 'warning' }
-      ];
 
+      // 显示加载状态
       document.getElementById('drawerContent').innerHTML = `
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">目标设置</h4>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-            <div class="stat-card">
-              <div class="stat-label">目标ACOS</div>
-              <div class="stat-value" style="font-size: 20px;">${target.targetAcos}%</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">当前ACOS</div>
-              <div class="stat-value ${getAcosStatus(target.currentAcos, target.targetAcos, target.tolerance) === 'high' ? 'danger' : 'success'}" style="font-size: 20px;">${target.currentAcos ? target.currentAcos.toFixed(1) + '%' : '-'}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">本周花费</div>
-              <div class="stat-value" style="font-size: 20px;">$${(campaigns.reduce((s, c) => s + c.spend, 0)).toFixed(0)}</div>
-            </div>
-          </div>
+        <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+          <div style="font-size: 24px; margin-bottom: 12px;">⏳</div>
+          正在加载真实数据...
         </div>
-
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">广告活动</h4>
-          <div class="campaign-cards">
-            ${campaigns.map(c => `
-              <div class="campaign-card">
-                <div class="campaign-card-header">
-                  <div>
-                    <h4>${c.name}</h4>
-                    <span>${c.type}</span>
-                  </div>
-                  <span class="status-badge ${c.status === 'active' ? 'active' : 'warning'}">${c.status === 'active' ? '正常' : '异常'}</span>
-                </div>
-                <div class="campaign-metrics">
-                  <div class="campaign-metric">
-                    <label>ACOS</label>
-                    <span style="color: ${c.acos > 20 ? 'var(--danger)' : c.acos < 15 ? 'var(--success)' : 'var(--text-primary)'}">${c.acos}%</span>
-                  </div>
-                  <div class="campaign-metric">
-                    <label>花费</label>
-                    <span>$${c.spend}</span>
-                  </div>
-                  <div class="campaign-metric">
-                    <label>销售额</label>
-                    <span>$${c.sales}</span>
-                  </div>
-                  <div class="campaign-metric">
-                    <label>ROAS</label>
-                    <span>${(c.sales / c.spend).toFixed(1)}</span>
-                  </div>
-                </div>
-                <div class="campaign-card-footer">
-                  <button class="campaign-card-btn" onclick="viewCampaignDetail('${c.id}', '${c.name}', '${c.type}')">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    查看投放数据
-                  </button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <div>
-          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">AI执行记录</h4>
-          <div style="background: var(--bg-input); border-radius: 8px; padding: 12px;">
-            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
-              <div style="display: flex; justify-content: space-between;">
-                <span>降低出价 - Auto广泛匹配</span>
-                <span style="color: var(--success);">完成</span>
-              </div>
-              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">出价 $1.20 → $1.05 | ACOS改善 3.2%</div>
-              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
-                <span style="font-size: 11px; color: var(--text-secondary);">2024-04-28 14:30</span>
-                <span style="font-size: 11px; color: var(--primary);">操作员：AI自动</span>
-              </div>
-            </div>
-            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
-              <div style="display: flex; justify-content: space-between;">
-                <span>添加否定词 - 商品投放</span>
-                <span style="color: var(--success);">完成</span>
-              </div>
-              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">添加 5 个否定关键词 | 预计节省 $12/天</div>
-              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
-                <span style="font-size: 11px; color: var(--text-secondary);">2024-04-28 10:15</span>
-                <span style="font-size: 11px; color: var(--primary);">操作员：${target.ownerName || 'AI自动'}</span>
-              </div>
-            </div>
-            <div>
-              <div style="display: flex; justify-content: space-between;">
-                <span>新增关键词 - 手动精准</span>
-                <span style="color: var(--success);">完成</span>
-              </div>
-              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">添加 3 个高表现关键词 | 建议出价 $0.85</div>
-              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
-                <span style="font-size: 11px; color: var(--text-secondary);">2024-04-27 16:45</span>
-                <span style="font-size: 11px; color: var(--primary);">操作员：李华</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 管理员查看操作日志 -->
-        ${currentUser.role === 'admin' ? `
-        <div style="margin-top: 24px;">
-          <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">操作日志</h4>
-          <div style="background: var(--bg-input); border-radius: 8px; padding: 12px;">
-            ${getTargetLogs(target.id).map(log => `
-              <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
-                <div style="display: flex; justify-content: space-between;">
-                  <span style="font-weight: 500;">${log.action}</span>
-                  <span style="color: var(--success); font-size: 12px;">${log.operator}</span>
-                </div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${log.details}</div>
-                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">${log.timestamp}</div>
-              </div>
-            `).join('')}
-            ${getTargetLogs(target.id).length === 0 ? '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">暂无操作记录</div>' : ''}
-          </div>
-        </div>
-        ` : ''}
       `;
+      document.getElementById('drawerOverlay').style.display = 'block';
+      document.getElementById('detailDrawer').classList.add('open');
 
-      document.getElementById('drawerOverlay').classList.add('show');
-      document.getElementById('detailDrawer').classList.add('show');
+      try {
+        // 从后端获取该广告组合的真实报告数据
+        const res = await fetch(`${API_BASE}/lingxing/portfolios/${target.portfolioId}?startDate=${document.getElementById('startDate')?.value || ''}&endDate=${document.getElementById('endDate')?.value || ''}`);
+        const result = await res.json();
+
+        let campaigns = [];
+        let totalSpend = 0;
+
+        if (result.success && result.data) {
+          const d = result.data;
+          totalSpend = d.campaign?.cost || 0;
+
+          if (d.adGroups && d.adGroups.length > 0) {
+            campaigns = d.adGroups.map(ag => ({
+              id: ag.ad_group_id || ag.id,
+              name: ag.ad_group_name || ag.name,
+              type: ag.type || '手动',
+              acos: parseFloat(ag.acos || 0),
+              spend: parseFloat(ag.cost || 0),
+              sales: parseFloat(ag.sales || 0),
+              status: (ag.status === 'enabled' || ag.status === 'active') ? 'active' : 'warning',
+            }));
+          } else if (d.campaign) {
+            const c = d.campaign;
+            campaigns = [{
+              id: c.campaign_id || target.portfolioId,
+              name: c.campaign_name || target.portfolioName,
+              type: c.type || '自动',
+              acos: parseFloat(c.acos || 0),
+              spend: parseFloat(c.cost || 0),
+              sales: parseFloat(c.sales || 0),
+              status: (c.status === 'enabled' || c.status === 'active' || !c.status) ? 'active' : 'warning',
+            }];
+          }
+        }
+
+        // 如果后端没有数据，显示空状态
+        if (campaigns.length === 0) {
+          campaigns = [];
+        }
+
+        document.getElementById('drawerContent').innerHTML = `
+          <div style="margin-bottom: 24px;">
+            <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">目标设置</h4>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+              <div class="stat-card">
+                <div class="stat-label">目标ACOS</div>
+                <div class="stat-value" style="font-size: 20px;">${target.targetAcos}%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">当前ACOS</div>
+                <div class="stat-value ${getAcosStatus(parseFloat(target.currentAcos), target.targetAcos, target.tolerance) === 'high' ? 'danger' : 'success'}" style="font-size: 20px;">${target.currentAcos ? parseFloat(target.currentAcos).toFixed(1) + '%' : '-'}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">总花费</div>
+                <div class="stat-value" style="font-size: 20px;">$${totalSpend.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+
+          ${campaigns.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">广告活动</h4>
+            <div class="campaign-cards">
+              ${campaigns.map(c => `
+                <div class="campaign-card">
+                  <div class="campaign-card-header">
+                    <div>
+                      <h4>${c.name}</h4>
+                      <span>${c.type}</span>
+                    </div>
+                    <span class="status-badge ${c.status === 'active' ? 'active' : 'warning'}">${c.status === 'active' ? '正常' : '异常'}</span>
+                  </div>
+                  <div class="campaign-metrics">
+                    <div class="campaign-metric">
+                      <label>ACOS</label>
+                      <span style="color: ${c.acos > 20 ? 'var(--danger)' : c.acos < 15 ? 'var(--success)' : 'var(--text-primary)'}">${c.acos.toFixed(1)}%</span>
+                    </div>
+                    <div class="campaign-metric">
+                      <label>花费</label>
+                      <span>$${c.spend.toFixed(2)}</span>
+                    </div>
+                    <div class="campaign-metric">
+                      <label>销售额</label>
+                      <span>$${c.sales.toFixed(2)}</span>
+                    </div>
+                    <div class="campaign-metric">
+                      <label>ROAS</label>
+                      <span>${c.spend > 0 ? (c.sales / c.spend).toFixed(1) : '-'}</span>
+                    </div>
+                  </div>
+                  <div class="campaign-card-footer">
+                    <button class="campaign-card-btn" onclick="alert('查看 \\'${c.name}\\' 的详细投放数据（开发中）')">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                      查看投放数据
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          ` : `
+          <div style="margin-bottom: 24px;">
+            <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">广告活动</h4>
+            <div style="background: var(--bg-input); border-radius: 8px; padding: 20px; text-align: center; color: var(--text-secondary);">
+              <p>暂无该广告组合的详细数据</p>
+              <p style="font-size: 12px; margin-top: 4px;">请先执行「数据同步」获取真实广告数据</p>
+            </div>
+          </div>
+          `}
+
+          <div>
+            <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">AI执行记录</h4>
+            <div style="background: var(--bg-input); border-radius: 8px; padding: 12px;">
+              <div style="padding: 16px; text-align: center; color: var(--text-secondary);">
+                <p style="font-size: 13px;">暂无操作记录</p>
+                <p style="font-size: 11px; margin-top: 4px;">当目标开始自动优化后，此处会显示 AI 的调价、否词等操作</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 管理员查看操作日志 -->
+          ${currentUser.role === 'admin' ? `
+          <div style="margin-top: 24px;">
+            <h4 style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; text-transform: uppercase;">操作日志</h4>
+            <div style="background: var(--bg-input); border-radius: 8px; padding: 12px;">
+              ${getTargetLogs(target.id).map(log => `
+                <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="font-weight: 500;">${log.action}</span>
+                    <span style="color: var(--success); font-size: 12px;">${log.operator}</span>
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${log.details}</div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">${log.timestamp}</div>
+                </div>
+              `).join('')}
+              ${getTargetLogs(target.id).length === 0 ? '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">暂无操作记录</div>' : ''}
+            </div>
+          </div>
+          ` : ''}
+        `;
+
+      } catch (e) {
+        console.error('加载详情失败:', e);
+        document.getElementById('drawerContent').innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+            <p>加载数据失败：${e.message}</p>
+            <button class="btn btn-secondary" onclick="viewDetail('${id}')" style="margin-top: 12px;">重试</button>
+          </div>
+        `;
+      }
     }
 
     // 获取目标的操作日志

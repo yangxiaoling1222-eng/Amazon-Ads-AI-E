@@ -30,7 +30,7 @@ function addOperationLog(operator, operationType, targetName, reason, details = 
 
 // ============ 广告组合接口 ============
 
-// 获取所有广告组合
+// 获取所有广告组合（本地目标 + 同步过来的广告组合，不含广告活动）
 router.get('/portfolios', (req, res) => {
   try {
     // 确保数据库已初始化
@@ -38,13 +38,33 @@ router.get('/portfolios', (req, res) => {
       return res.status(503).json({ success: false, message: '数据库正在初始化，请稍后重试' });
     }
     
-    const portfolios = db.query(`
+    // 1. 本地 portfolios 表（AI优化器创建的目标）
+    const localPortfolios = db.query(`
       SELECT p.*, u.name as owner_name 
       FROM portfolios p 
       LEFT JOIN users u ON p.owner_id = u.id
       ORDER BY p.created_at DESC
     `);
-    res.json({ success: true, data: portfolios });
+
+    // 2. 同步过来的广告组合（来自领星 portfolios 接口）— 注意：不包含广告活动(campaigns)
+    let syncPortfolios = [];
+    try { syncPortfolios = db.query('SELECT portfolio_id as id, name, type, status, budget, store_id FROM sync_portfolios'); } catch(e) {}
+
+    // 合并去重（以 id 为准）
+    const mergedMap = {};
+    
+    // 优先本地数据
+    localPortfolios.forEach(p => { mergedMap[p.id] = p; });
+    
+    // 补充同步过来的广告组合（本地没有的才添加）
+    syncPortfolios.forEach(p => {
+      if (!mergedMap[p.id]) {
+        mergedMap[p.id] = { ...p, owner_name: null };
+      }
+    });
+
+    const allPortfolios = Object.values(mergedMap);
+    res.json({ success: true, data: allPortfolios });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

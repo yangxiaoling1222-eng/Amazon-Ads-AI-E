@@ -104,28 +104,234 @@ router.post('/portfolio/performance', async (req, res) => {
   }
 });
 
-// 同步广告数据
+// ============ 分层同步策略 ============
+// 
+// 【元数据层】（定时同步 / 手动触发）：
+//   - 店铺、产品、广告组合、广告活动列表（名称/状态/预算等）
+//   - 变化频率低 → 每小时自动同步一次，前端下拉框秒开
+//   - 路由: POST /sync  （只同步元数据）
+//
+// 【报告数据层】（实时查询）：
+//   - 广告投放报告（花费/曝光/点击/ACoS/搜索词/ASIN等）
+//   - 变化频率高 + 按日期动态筛选 → 用户筛选时实时调领星API
+//   - 路由: POST /reports （实时代理到领星）
+
+// ── 同步元数据（不含报告） ────────────────────────────────
+// 前端"同步数据"按钮和定时任务都走这里
+// 只同步：店铺 + 产品 + 广告组合 + 广告活动（元数据）
+// 不再批量拉取并缓存报告数据
+
 router.post('/sync', async (req, res) => {
+  try {
+    const { storeId } = req.body;
+
+    // 复用 cron/metadata-sync 的核心逻辑
+    const metadataSync = require('../cron/metadata-sync');
+    const result = await metadataSync.syncMetadata();
+
+    res.json({
+      success: true,
+      data: result,
+      message: '元数据同步完成（广告组合/活动/产品/店铺）。报告数据将在查询时实时获取。'
+    });
+  } catch (error) {
+    db.run(
+      'INSERT INTO sync_logs (sync_type, status, message) VALUES (?, ?, ?)',
+      ['metadata', 'error', error.message]
+    );
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ── 实时报告代理（核心新接口） ────────────────────────────
+// 用户在前端选择日期范围/筛选条件后，直接转发请求到领星 API
+// 不经过本地缓存，始终返回最新数据
+//
+// 支持的报告类型（通过 type 参数区分）：
+//   campaign  - 广告活动报告（spCampaignReports）
+//   adGroup   - 广告组报告（spAdGroupReports）
+//   searchTerm- 搜索词报告（queryWordReports）
+//   keyword   - 关键词报告（spKeywordReports）
+//   target    - 商品定位报告（spTargetReports）
+//   productAd - 商品报告（spProductAdReports）
+//   asin      - ASIN报告（asinReports）
+//   placement - 广告位报告（campaignPlacementReports）
+//
+// 查询参数：
+//   sid/storeId     - 店铺ID（必填）
+//   startDate       - 起始日期 YYYY-MM-DD（必填）
+//   endDate         - 结束日期 YYYY-MM-DD（必填）
+//   type            - 报告类型，默认 campaign
+//   campaignId      - 广告活动ID（可选，用于过滤）
+//   showDetail      - 是否展示详情 0/1
+
+router.post('/reports', async (req, res) => {
+  try {
+    const {
+      sid, storeId,
+      startDate, endDate,
+      type = 'campaign',
+      campaignId,
+      showDetail = false
+    } = req.body;
+
+    const storeSid = String(sid || storeId || '');
+    if (!storeSid) {
+      return res.status(400).json({ success: false, message: '缺少店铺ID (sid/storeId)' });
+    }
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: '缺少日期范围 (startDate/endDate)' });
+    }
+
+    console.log(`[实时报告] 请求类型=${type}, 店铺=${storeSid}, ${startDate} ~ ${endDate}`);
+
+    // 根据报告类型调用对应的领星接口，逐天聚合
+    const allData = [];
+    const dates = _getDateRange(startDate, endDate);
+
+    for (const date of dates) {
+      try {
+        let dayData;
+        switch (type) {
+          case 'adGroup':
+            dayData = await lingxingService.getAdGroupReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'searchTerm':
+            dayData = await lingxingService.getSearchTermReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'keyword':
+            dayData = await lingxingService.getKeywordReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'target':
+            dayData = await lingxingService.getTargetReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'productAd':
+            dayData = await lingxingService.getProductAdReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'asin':
+            dayData = await lingxingService.getAsinReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'placement':
+            dayData = await lingxingService.getPlacementReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+          case 'campaign':
+          default:
+            dayData = await lingxingService.getCampaignReport({ sid: storeSid, reportDate: date, showDetail });
+            break;
+        }
+
+        const items = Array.isArray(dayData) ? dayData : (dayData?.data || []);
+
+        // 补充日期和店铺信息，按需过滤 campaignId
+        for (const item of items) {
+          if (campaignId && item.campaign_id !== campaignId) continue;
+          allData.push({
+            ...item,
+            _reportDate: item.report_date || date,
+            _storeId: storeSid,
+            impressions: parseInt(item.impressions) || 0,
+            clicks: parseInt(item.clicks) || 0,
+            cost: parseFloat(item.cost) || 0,
+            sales: parseFloat(item.sales) || 0,
+            orders: parseInt(item.orders || item.attributed_units_ordered || 0) || 0
+          });
+        }
+
+        if (items.length > 0) {
+          console.log(`[实时报告] ${date} [${type}]: ${items.length} 条`);
+        }
+      } catch (e) {
+        console.warn(`[实时报告] ${date} [${type}] 获取失败:`, e.message);
+        // 单天失败不中断整体
+      }
+
+      // 避免请求过快
+      if (date !== dates[dates.length - 1]) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    // 计算汇总指标
+    const summary = allData.reduce((acc, item) => {
+      acc.impressions += item.impressions;
+      acc.clicks += item.clicks;
+      acc.cost += item.cost;
+      acc.sales += item.sales;
+      acc.orders += item.orders;
+      return acc;
+    }, { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 });
+
+    const sImp = summary.impressions, sClicks = summary.clicks;
+    const sCost = summary.cost, sSales = summary.sales;
+    summary.ctr   = sImp > 0 ? parseFloat((sClicks / sImp * 100).toFixed(2)) : 0;
+    summary.cpc   = sClicks > 0 ? parseFloat((sCost / sClicks).toFixed(2)) : 0;
+    summary.acos  = sSales > 0 ? parseFloat((sCost / sSales * 100).toFixed(2)) : 0;
+    summary.roas  = sCost > 0 ? parseFloat((sSales / sCost).toFixed(2)) : 0;
+
+    console.log(`[实时报告] ${type} 查询完成: 共 ${allData.length} 条, ${startDate} ~ ${endDate}`);
+
+    res.json({
+      success: true,
+      data: allData,
+      summary,
+      queryInfo: {
+        type,
+        storeId: storeSid,
+        startDate,
+        endDate,
+        totalDays: dates.length,
+        recordCount: allData.length,
+        fetchedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('[实时报告] 查询失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * 生成日期范围数组
+ */
+function _getDateRange(startDate, endDate) {
+  const dates = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const cur = new Date(start);
+  while (cur <= end) {
+    dates.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+// ============ 旧版同步接口（保留兼容） ============
+// 注意：旧版 sync 会全量同步含报告数据，建议逐步迁移到新的分层策略
+
+router.post('/sync/full', async (req, res) => {
   try {
     const { storeId, startDate, endDate } = req.body;
     
     // 获取店铺列表
     const stores = await lingxingService.getStores();
     
-    // 逐个店铺同步产品、广告活动、报告
+    // 逐个店铺同步产品、广告活动、广告组合、报告
     let allProducts = [];
     let allCampaigns = [];
+    let allPortfolios = [];
     let allReports = [];
-    
+
     for (const store of stores || []) {
       try {
-        const [products, campaigns, reportData] = await Promise.all([
+        const [products, campaigns, portfolios, reportData] = await Promise.all([
           lingxingService.getProducts({ storeId: store.sid }),
           lingxingService.getCampaigns({ sid: store.sid }),
-          lingxingService.getAdReport({ storeId: store.sid, startDate, endDate })
+          lingxingService.getPortfolios({ sid: store.sid }),
+          lingxingService.getAdReport({ sid: store.sid, startDate, endDate })
         ]);
         allProducts = allProducts.concat(products || []);
         allCampaigns = allCampaigns.concat(campaigns || []);
+        allPortfolios = allPortfolios.concat((Array.isArray(portfolios) ? portfolios : (portfolios?.data || [])) || []);
         allReports = allReports.concat((reportData.data || reportData) || []);
       } catch (e) {
         console.warn(`[sync] 店铺 ${store.sid} 同步失败:`, e.message);
@@ -136,6 +342,7 @@ router.post('/sync', async (req, res) => {
     saveStores(stores);
     saveProducts(allProducts);
     saveCampaigns(allCampaigns);
+    savePortfolios(allPortfolios);
     
     // 按店铺分组保存报告（带上 store_id）
     const reportsByStore = {};
@@ -162,7 +369,7 @@ router.post('/sync', async (req, res) => {
     // 记录同步日志
     db.run(
       'INSERT INTO sync_logs (sync_type, status, message) VALUES (?, ?, ?)',
-      ['full', 'success', `同步完成: ${stores.length}店铺, ${allProducts.length}产品, ${allCampaigns.length}活动, ${allReports.length}报告`]
+      ['full', 'success', `同步完成: ${stores.length}店铺, ${allProducts.length}产品, ${allCampaigns.length}活动, ${allPortfolios.length}广告组合, ${allReports.length}报告`]
     );
     
     res.json({ 
@@ -171,6 +378,7 @@ router.post('/sync', async (req, res) => {
         stores: stores.length,
         products: allProducts.length,
         campaigns: allCampaigns.length,
+        portfolios: allPortfolios.length,
         reports: allReports.length
       }
     });
@@ -191,6 +399,14 @@ router.get('/debug', async (req, res) => {
     const campaigns = db.query('SELECT * FROM sync_campaigns');
     const reports = db.query('SELECT * FROM sync_reports LIMIT 10');
     
+    // 检查 sync_portfolios 表是否存在
+    let portfolios = [];
+    try { portfolios = db.query('SELECT * FROM sync_portfolios'); } catch(e) {}
+    
+    // 也检查本地 portfolios 表
+    let localPortfolios = [];
+    try { localPortfolios = db.query('SELECT * FROM portfolios'); } catch(e) {}
+
     res.json({
       success: true,
       debug: {
@@ -198,8 +414,11 @@ router.get('/debug', async (req, res) => {
         productsCount: products.length,
         campaignsCount: campaigns.length,
         reportsCount: reports.length,
+        portfoliosCount: portfolios.length,
+        localPortfoliosCount: localPortfolios.length,
         stores: stores.slice(0, 3),
-        campaigns: campaigns.slice(0, 3)
+        campaigns: campaigns.slice(0, 3),
+        portfolios: portfolios.slice(0, 3),
       }
     });
   } catch (error) {
@@ -209,10 +428,10 @@ router.get('/debug', async (req, res) => {
 
 // ============ 广告数据（组合/活动视图） ============
 
-// 获取广告组合列表（支持店铺+日期筛选）
+// 获取广告组合列表（支持店铺+日期+状态筛选）
 router.get('/portfolios', async (req, res) => {
   try {
-    const { storeId, startDate, endDate, page, pageSize } = req.query;
+    const { storeId, startDate, endDate, page, pageSize, status } = req.query;
     const pageNum = parseInt(page) || 1;
     const pageSz = parseInt(pageSize) || 20;
 
@@ -221,6 +440,13 @@ router.get('/portfolios', async (req, res) => {
     if (storeId) {
       const sid = String(storeId);
       campaigns = campaigns.filter(c => String(c.store_id || '') === sid);
+    }
+    // 状态筛选：默认屏蔽 archived / deleted
+    if (status && status !== '') {
+      campaigns = campaigns.filter(c => (c.status || 'enabled') === status);
+    } else {
+      // 默认过滤掉已归档的
+      campaigns = campaigns.filter(c => !['archived', 'deleted', 'paused'].includes(c.status));
     }
 
     // 按 campaign_id 聚合报告数据（可按日期范围筛选）
@@ -335,12 +561,47 @@ router.get('/portfolios/:id', async (req, res) => {
     const stores = db.query('SELECT * FROM sync_stores WHERE store_id = ?', [c.store_id]);
     const storeName = stores.length ? stores[0].store_name : c.store_id;
 
-    // 模拟广告组数据（mock阶段）
-    const adGroups = [
-      { ad_group_id: `${id}_ag1`, ad_group_name: '精准词组A', status: 'enabled', bids: 1.2, impressions: Math.floor(imp * 0.4), clicks: Math.floor(clicks * 0.38), cost: parseFloat((cost * 0.38).toFixed(2)), sales: parseFloat((sales * 0.4).toFixed(2)), orders: Math.floor(m.orders * 0.38), acos: sales > 0 ? parseFloat((cost * 0.38 / (sales * 0.4) * 100).toFixed(2)) : 0 },
-      { ad_group_id: `${id}_ag2`, ad_group_name: '精准词组B', status: 'enabled', bids: 0.85, impressions: Math.floor(imp * 0.35), clicks: Math.floor(clicks * 0.35), cost: parseFloat((cost * 0.35).toFixed(2)), sales: parseFloat((sales * 0.35).toFixed(2)), orders: Math.floor(m.orders * 0.35), acos: sales > 0 ? parseFloat((cost * 0.35 / (sales * 0.35) * 100).toFixed(2)) : 0 },
-      { ad_group_id: `${id}_ag3`, ad_group_name: '自动匹配组', status: 'enabled', bids: 0.6, impressions: Math.floor(imp * 0.25), clicks: Math.floor(clicks * 0.27), cost: parseFloat((cost * 0.27).toFixed(2)), sales: parseFloat((sales * 0.25).toFixed(2)), orders: Math.floor(m.orders * 0.27), acos: sales > 0 ? parseFloat((cost * 0.27 / (sales * 0.25) * 100).toFixed(2)) : 0 },
-    ];
+    // 从 sync_reports 获取该活动下各广告组的真实数据
+    // 按 campaign_id 分组聚合报告数据作为广告组维度展示
+    let adGroups = [];
+    try {
+      // 尝试从报告中获取子维度数据（如果有 ad_group_id 字段）
+      const groupReports = db.query(`
+        SELECT 
+          COALESCE(ad_group_id, campaign_id || '_default') as ad_group_id,
+          COALESCE(ad_group_name, campaign_name, '默认') as ad_group_name,
+          status,
+          SUM(impressions) as impressions,
+          SUM(clicks) as clicks,
+          SUM(cost) as cost,
+          SUM(sales) as sales,
+          SUM(orders) as orders
+        FROM sync_reports 
+        WHERE campaign_id = ?
+        GROUP BY COALESCE(ad_group_id, campaign_id || '_default')
+      `, [id]);
+
+      if (groupReports.length > 0) {
+        adGroups = groupReports.map(gr => ({
+          ad_group_id: gr.ad_group_id,
+          ad_group_name: gr.ad_group_name,
+          status: gr.status || 'enabled',
+          bids: 0,
+          impressions: parseInt(gr.impressions) || 0,
+          clicks: parseInt(gr.clicks) || 0,
+          cost: parseFloat(gr.cost) || 0,
+          sales: parseFloat(gr.sales) || 0,
+          orders: parseInt(gr.orders) || 0,
+          acos: parseFloat(gr.sales) > 0 ? parseFloat((parseFloat(gr.cost) / parseFloat(gr.sales) * 100).toFixed(2)) : 0
+        }));
+      } else {
+        // 没有报告子数据时，返回空数组（不再使用假数据）
+        adGroups = [];
+      }
+    } catch(e) {
+      console.warn('[portfolio detail] 广告组查询失败:', e.message);
+      adGroups = [];
+    }
 
     res.json({
       success: true,
@@ -520,6 +781,36 @@ function saveCampaigns(campaigns) {
       (campaign_id, campaign_name, type, status, budget, store_id, last_sync_at)
       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
     `, [campaign.campaign_id, campaign.name || '', campaign.campaign_type || 'unknown', campaign.state || 'enabled', campaign.daily_budget || 0, campaign.sid || null]);
+  }
+}
+
+function savePortfolios(portfolios) {
+  if (!portfolios || portfolios.length === 0) return;
+  for (const p of portfolios) {
+    // 领星返回的 portfolio 字段：portfolio_id / name / state / budget / currency 等
+    // 同时更新本地 portfolios 表（AI优化器用）和 sync_portfolios 表（展示用）
+    const pid = p.portfolio_id || p.campaign_id || p.id;
+    if (!pid) continue;
+
+    // 写入 sync_portfolios 表
+    try {
+      db.run(`
+        INSERT OR REPLACE INTO sync_portfolios 
+        (portfolio_id, name, type, status, budget, store_id, last_sync_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `, [pid, p.name || p.portfolio_name || '', p.type || p.portfolio_type || 'portfolio', p.state || p.status || 'enabled', p.budget || p.daily_budget || 0, p.sid || p.store_id || null]);
+    } catch(e) { /* 表可能还不存在，忽略 */ }
+
+    // 同步到 AI优化器的 portfolios 表（让新增目标弹窗能看到）
+    try {
+      const exists = db.query('SELECT id FROM portfolios WHERE id = ?', [pid]);
+      if (exists.length === 0) {
+        db.run(`
+          INSERT INTO portfolios (id, name, store_id, status, target_acos, current_acos) 
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [pid, p.name || p.portfolio_name || pid, p.sid || p.store_id || '', p.state || p.status || 'active', 20, 0]);
+      }
+    } catch(e) { /* 忽略 */ }
   }
 }
 

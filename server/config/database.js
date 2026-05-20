@@ -181,6 +181,20 @@ function createTables() {
     )
   `);
 
+  // 同步广告组合表（来自领星 portfolios 接口）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sync_portfolios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      portfolio_id TEXT UNIQUE,
+      name TEXT,
+      type TEXT DEFAULT 'portfolio',
+      status TEXT DEFAULT 'enabled',
+      budget REAL DEFAULT 0,
+      store_id TEXT,
+      last_sync_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // 同步报告表
   db.run(`
     CREATE TABLE IF NOT EXISTS sync_reports (

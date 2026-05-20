@@ -339,6 +339,7 @@ class LingxingService {
     const reqConfig = {
       method,
       url,
+      timeout: 120000, // 120秒超时（报告数据量大，需要更长时间）
       headers: {
         'Content-Type': 'application/json',
         'X-API-VERSION': '2'
@@ -854,8 +855,8 @@ class LingxingService {
   // ==================== 报告数据接口（兼容旧接口） ====================
 
   /**
-   * 获取广告报告数据（兼容旧接口，使用SP广告活动报告）
-   * 注意：领星文档中未明确提供报告接口，使用模拟数据
+   * 获取广告报告数据（使用真实 SP 广告活动报告接口）
+   * 逐天调用 spCampaignReports 接口，聚合多天数据
    */
   async getAdReport(params = {}) {
     if (this.mockMode) {
@@ -888,13 +889,93 @@ class LingxingService {
       
       return { data, summary };
     }
-    // 报告接口在文档中未明确列出，使用模拟数据
-    console.log('[Info] 广告报告接口未在文档中定义，使用模拟数据');
-    let data = MOCK_DATA.reportData;
-    if (params.campaignId) data = data.filter(d => d.campaign_id === params.campaignId);
-    if (params.startDate) data = data.filter(d => d.date >= params.startDate);
-    if (params.endDate) data = data.filter(d => d.date <= params.endDate);
-    return { data, summary: {} };
+
+    // 真实模式：逐天调用 spCampaignReports 接口
+    const sid = params.sid || params.storeId;
+    const startDate = params.startDate || this.getDefaultStartDate();
+    const endDate = params.endDate || new Date().toISOString().slice(0, 10);
+
+    console.log(`[getAdReport] 开始拉取报告数据: sid=${sid}, ${startDate} ~ ${endDate}`);
+
+    const allData = [];
+    
+    // 逐天遍历日期范围
+    let current = new Date(startDate);
+    const end = new Date(endDate);
+    
+    while (current <= end) {
+      const reportDate = current.toISOString().slice(0, 10);
+      try {
+        const dayData = await this.getCampaignReport({
+          sid,
+          reportDate,
+          showDetail: false
+        });
+        
+        // dayData 可能是 { data: [...], total: N } 格式或直接数组
+        const items = Array.isArray(dayData) ? dayData : (dayData?.data || []);
+        
+        // 将每条记录补上 report_date
+        for (const item of items) {
+          allData.push({
+            ...item,
+            date: item.report_date || reportDate,
+            campaign_id: item.campaign_id || null,
+            store_id: String(sid || ''),
+            impressions: parseInt(item.impressions) || 0,
+            clicks: parseInt(item.clicks) || 0,
+            cost: parseFloat(item.cost) || 0,
+            sales: parseFloat(item.sales) || 0,
+            orders: parseInt(item.orders || item.attributed_units_ordered || 0) || 0,
+            ctr: item.ctr || 0,
+            cpc: item.cpc || 0,
+            acos: item.acos || 0,
+            roas: item.roas || 0
+          });
+        }
+        
+        if (items.length > 0) {
+          console.log(`[getAdReport] ${reportDate}: 获取 ${items.length} 条记录`);
+        }
+      } catch (e) {
+        console.warn(`[getAdReport] ${reportDate} 获取失败:`, e.message);
+        // 单天失败不影响其他天数
+      }
+      
+      current.setDate(current.getDate() + 1);
+      
+      // 避免请求过快，稍微间隔（API 可能有频率限制）
+      if (current <= end) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    // 计算汇总
+    const summary = allData.reduce((acc, item) => {
+      acc.impressions += item.impressions;
+      acc.clicks += item.clicks;
+      acc.cost += item.cost;
+      acc.sales += item.sales;
+      acc.orders += item.orders;
+      return acc;
+    }, { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 });
+
+    summary.ctr = summary.impressions > 0 ? (summary.clicks / summary.impressions * 100).toFixed(2) : '0';
+    summary.cpc = summary.clicks > 0 ? (summary.cost / summary.clicks).toFixed(2) : '0';
+    summary.acos = summary.sales > 0 ? (summary.cost / summary.sales * 100).toFixed(2) : '0';
+    summary.roas = summary.cost > 0 ? (summary.sales / summary.cost).toFixed(2) : '0';
+
+    console.log(`[getAdReport] 报告拉取完成: 共 ${allData.length} 条记录`);
+    return { data: allData, summary };
+  }
+
+  /**
+   * 获取默认起始日期（30天前）
+   */
+  getDefaultStartDate() {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
   }
 
   /**

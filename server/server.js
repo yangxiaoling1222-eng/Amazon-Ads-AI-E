@@ -12,6 +12,7 @@ const crypto = require('crypto');
 // 导入数据库
 const db = require('./config/database');
 const syncScheduler = require('./services/sync-scheduler');
+const metadataSync = require('./cron/metadata-sync');
 
 // 导入路由
 const apiRoutes = require('./routes/api');
@@ -267,9 +268,13 @@ async function startServer() {
     await db.ready();
     console.log('✅ 数据库就绪');
 
-    // 初始化自动数据同步调度器
+    // 初始化自动数据同步调度器（旧版全量同步，保留兼容）
     syncScheduler.init();
     console.log('✅ 同步调度器初始化完成');
+
+    // 初始化定时元数据同步（新版：每小时只同步店铺/产品/广告组合/活动列表）
+    metadataSync.startSchedule(60); // 默认每60分钟
+    console.log('✅ 元数据定时同步已启动（每小时）');
     
     app.listen(PORT, () => {
       console.log(`

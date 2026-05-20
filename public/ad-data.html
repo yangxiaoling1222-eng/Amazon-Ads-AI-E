@@ -415,6 +415,16 @@
         </select>
       </div>
       <div class="filter-group">
+        <label>状态</label>
+        <select id="filterStatus" onchange="loadPortfolios()">
+          <option value="">进行中</option>
+          <option value="enabled">启用</option>
+          <option value="paused">暂停</option>
+          <option value="archived">归档</option>
+          <option value="__all__">全部状态</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <label>开始日期</label>
         <input type="date" id="filterStart" onchange="loadPortfolios()" />
       </div>
@@ -565,9 +575,26 @@ async function loadStores() {
   }
 }
 
+// ============ 重置筛选 ============
+function resetFilters() {
+  document.getElementById('filterStore').value = '';
+  document.getElementById('filterStatus').value = '';
+  const end   = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 29);
+  document.getElementById('filterEnd').value   = fmtDate(end);
+  document.getElementById('filterStart').value  = fmtDate(start);
+  state.page = 1;
+  loadPortfolios();
+}
+
 // ============ 加载广告数据 ============
+// 分层策略：
+//   1. 广告活动列表元数据（名称/类型/状态/预算）→ 读本地 SQLite（秒开）
+//   2. 广告投放报告数据（花费/曝光/点击/ACoS）→ 实时调领星 API
 async function loadPortfolios() {
   const storeId  = document.getElementById('filterStore').value;
+  const status   = document.getElementById('filterStatus').value;
   const start    = document.getElementById('filterStart').value;
   const end      = document.getElementById('filterEnd').value;
 
@@ -575,21 +602,86 @@ async function loadPortfolios() {
     '<tr><td colspan="12"><div class="loading-mask"><div class="spinner"></div>加载中…</div></td></tr>';
 
   try {
+    // ── 第一步：从本地读取广告活动元数据（已通过定时任务同步）──
     const params = new URLSearchParams({
       page: state.page,
       pageSize: state.pageSize,
     });
     if (storeId) params.set('storeId', storeId);
-    if (start)   params.set('startDate', start);
-    if (end)     params.set('endDate', end);
+    if (status && status !== '') params.set('status', status);
 
     const res  = await fetch(`${API}/portfolios?${params}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message);
 
-    state.list    = json.data;
-    state.summary = json.summary;
-    state.total   = json.total;
+    // 元数据列表（不含报告指标）
+    let campaigns = json.data || [];
+    state.total   = json.total || campaigns.length;
+
+    // ── 第二步：实时从领星获取报告数据 ──
+    if (start && end && storeId) {
+      try {
+        const reportRes = await fetch(`${API}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sid: storeId,
+            startDate: start,
+            endDate: end,
+            type: 'campaign'
+          })
+        });
+        const reportJson = await reportRes.json();
+        if (reportJson.success && reportJson.data) {
+          // 按 campaign_id 聚合实时报告数据
+          const reportMap = {};
+          for (const r of reportJson.data) {
+            const cid = r.campaign_id;
+            if (!reportMap[cid]) {
+              reportMap[cid] = { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 };
+            }
+            reportMap[cid].impressions += r.impressions || 0;
+            reportMap[cid].clicks       += r.clicks || 0;
+            reportMap[cid].cost         += r.cost || 0;
+            reportMap[cid].sales        += r.sales || 0;
+            reportMap[cid].orders       += r.orders || 0;
+          }
+
+          // 将实时报告数据合并到活动列表
+          campaigns = campaigns.map(c => {
+            const m = reportMap[c.campaign_id] || {};
+            const cost   = parseFloat(m.cost)   || 0;
+            const sales  = parseFloat(m.sales)  || 0;
+            const clicks = parseInt(m.clicks)   || 0;
+            const imp    = parseInt(m.impressions) || 0;
+            return {
+              ...c,
+              impressions: imp,
+              clicks,
+              cost: parseFloat(cost.toFixed(2)),
+              sales: parseFloat(sales.toFixed(2)),
+              orders: m.orders || 0,
+              ctr:  imp > 0 ? parseFloat((clicks / imp * 100).toFixed(2)) : 0,
+              cpc:  clicks > 0 ? parseFloat((cost / clicks).toFixed(2)) : 0,
+              acos: sales > 0 ? parseFloat((cost / sales * 100).toFixed(2)) : 0,
+              roas: cost > 0 ? parseFloat((sales / cost).toFixed(2)) : 0,
+            };
+          });
+
+          // 用实时数据更新汇总
+          state.summary = _calcSummary(campaigns);
+        }
+      } catch (e) {
+        console.warn('[实时报告] 获取失败，使用本地缓存数据:', e.message);
+        // 实时失败时降级到本地数据
+        state.summary = json.summary || {};
+      }
+    } else {
+      // 未选店铺或日期时，用本地缓存数据
+      state.summary = json.summary || {};
+    }
+
+    state.list = campaigns;
 
     renderSummary();
     renderTable();
@@ -598,6 +690,19 @@ async function loadPortfolios() {
     document.getElementById('tableBody').innerHTML =
       `<tr><td colspan="12"><div class="empty-state">❌ 加载失败: ${e.message}</div></td></tr>`;
   }
+}
+
+// 从活动列表计算汇总指标
+function _calcSummary(list) {
+  return list.reduce((acc, item) => {
+    acc.total     = (acc.total || 0) + 1;
+    acc.impressions = (acc.impressions || 0) + (item.impressions || 0);
+    acc.clicks      = (acc.clicks || 0) + (item.clicks || 0);
+    acc.cost        = (acc.cost || 0) + (item.cost || 0);
+    acc.sales       = (acc.sales || 0) + (item.sales || 0);
+    acc.orders      = (acc.orders || 0) + (item.orders || 0);
+    return acc;
+  }, { total: 0, impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 });
 }
 
 // ============ 渲染汇总 ============
@@ -676,26 +781,99 @@ function changePage(delta) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ============ 打开详情 ============
+// ============ 打开详情（实时从领星获取） ============
 async function openDetail(campaignId) {
-  const start = document.getElementById('filterStart').value;
-  const end   = document.getElementById('filterEnd').value;
-  const params = new URLSearchParams();
-  if (start) params.set('startDate', start);
-  if (end)   params.set('endDate', end);
+  const storeId = document.getElementById('filterStore').value;
+  const start   = document.getElementById('filterStart').value;
+  const end     = document.getElementById('filterEnd').value;
+
+  // 显示加载中状态
+  document.getElementById('modalTitle').textContent = '加载中…';
+  document.getElementById('modalBody').innerHTML =
+    '<div class="loading-mask"><div class="spinner"></div>正在从领星拉取实时数据…</div>';
+  document.getElementById('detailModal').classList.add('show');
 
   try {
-    const res  = await fetch(`${API}/portfolios/${campaignId}?${params}`);
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message);
+    // 先拿活动基本信息（本地元数据）
+    const metaRes  = await fetch(`${API}/portfolios/${campaignId}`);
+    const metaJson = await metaRes.json();
+    const campaignMeta = (metaJson.success && metaJson.data?.campaign) || metaJson.data?.campaign || {};
 
-    const { campaign, adGroups } = json.data;
+    // 实时拉取该活动的报告数据
+    let campaignData = { ...campaignMeta, daily: [], adGroups: [] };
 
-    document.getElementById('modalTitle').textContent = campaign.campaign_name;
-    document.getElementById('modalType').textContent  = typeLabel(campaign.type);
-    document.getElementById('modalLxLink').href       = campaign.lingxing_url;
+    if (storeId && start && end) {
+      try {
+        const reportRes = await fetch(`${API}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sid: storeId,
+            startDate: start,
+            endDate: end,
+            type: 'campaign',
+            campaignId: campaignId,
+            showDetail: true
+          })
+        });
+        const reportJson = await reportRes.json();
+        if (reportJson.success && reportJson.data) {
+          const s = reportJson.summary || {};
+          campaignData.impressions = s.impressions || 0;
+          campaignData.clicks      = s.clicks || 0;
+          campaignData.cost        = parseFloat(s.cost?.toFixed(2)) || 0;
+          campaignData.sales       = parseFloat(s.sales?.toFixed(2)) || 0;
+          campaignData.orders      = s.orders || 0;
+          campaignData.ctr = s.ctr || 0;
+          campaignData.cpc = s.cpc || 0;
+          campaignData.acos = s.acos || 0;
+          campaignData.roas = s.roas || 0;
 
-    const s = campaign;
+          // 按日期聚合每日趋势
+          const byDate = {};
+          for (const r of reportJson.data) {
+            const d = r._reportDate || r.report_date || r.date;
+            if (!byDate[d]) byDate[d] = { date: d, cost: 0, sales: 0, impressions: 0, clicks: 0, orders: 0 };
+            byDate[d].cost        += r.cost || 0;
+            byDate[d].sales       += r.sales || 0;
+            byDate[d].impressions += r.impressions || 0;
+            byDate[d].clicks      += r.clicks || 0;
+            byDate[d].orders      += r.orders || 0;
+          }
+          campaignData.daily = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+
+          // 广告组维度（如果返回的数据包含 ad_group_id）
+          if (reportJson.data[0]?.ad_group_id) {
+            const byAg = {};
+            for (const r of reportJson.data) {
+              const agId = r.ad_group_id || campaignId + '_default';
+              if (!byAg[agId]) {
+                byAg[agId] = { ad_group_id: agId, ad_group_name: r.ad_group_name || '默认', status: 'enabled', impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0 };
+              }
+              byAg[agId].impressions += r.impressions || 0;
+              byAg[agId].clicks      += r.clicks || 0;
+              byAg[agId].cost        += r.cost || 0;
+              byAg[agId].sales       += r.sales || 0;
+              byAg[agId].orders      += r.orders || 0;
+            }
+            campaignData.adGroups = Object.values(byAg).map(ag => ({
+              ...ag,
+              cpc: ag.clicks > 0 ? parseFloat((ag.cost / ag.clicks).toFixed(2)) : 0,
+              acos: ag.sales > 0 ? parseFloat((ag.cost / ag.sales * 100).toFixed(2)) : 0
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('[详情实时报告] 失败，使用本地数据:', e.message);
+      }
+    }
+
+    // ── 渲染详情弹窗 ──
+    const s = campaignData;
+    document.getElementById('modalTitle').textContent = s.campaign_name || campaignId;
+    document.getElementById('modalType').textContent  = typeLabel(s.type);
+    document.getElementById('modalLxLink').href       = s.lingxing_url || '';
+
     const body = document.getElementById('modalBody');
     body.innerHTML = `
       <!-- 概览 KPI -->
@@ -710,7 +888,7 @@ async function openDetail(campaignId) {
         </div>
         <div class="detail-kpi">
           <div class="k-label">CTR</div>
-          <div class="k-value">${s.ctr}%</div>
+          <div class="k-value">${parseFloat(s.ctr || 0).toFixed(2)}%</div>
         </div>
         <div class="detail-kpi">
           <div class="k-label">花费</div>
@@ -722,18 +900,19 @@ async function openDetail(campaignId) {
         </div>
         <div class="detail-kpi">
           <div class="k-label">ACOS</div>
-          <div class="k-value" style="color:${acosColorHex(s.acos)}">${s.acos}%</div>
+          <div class="k-value" style="color:${acosColorHex(s.acos)}">${parseFloat(s.acos || 0).toFixed(2)}%</div>
         </div>
       </div>
 
       <!-- 每日趋势图 -->
-      <div class="sub-table-title">每日趋势</div>
+      <div class="sub-table-title">每日趋势 <span style="font-size:11px;color:var(--text-secondary);font-weight:400;">（实时数据）</span></div>
       <div class="chart-area">
         <canvas id="detailChart" height="180"></canvas>
       </div>
 
       <!-- 广告组明细 -->
       <div class="sub-table-title">广告组明细</div>
+      ${s.adGroups && s.adGroups.length > 0 ? `
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:#f9fafb;">
@@ -748,7 +927,7 @@ async function openDetail(campaignId) {
           </tr>
         </thead>
         <tbody>
-          ${adGroups.map(ag => {
+          ${s.adGroups.map(ag => {
             const agAcos = ag.acos || 0;
             return `<tr>
               <td style="padding:9px 12px;border:1px solid #f0f1f3;font-weight:500;">${ag.ad_group_name}</td>
@@ -760,19 +939,20 @@ async function openDetail(campaignId) {
               <td style="padding:9px 12px;border:1px solid #f0f1f3;text-align:right;">¥${ag.cpc}</td>
               <td style="padding:9px 12px;border:1px solid #f0f1f3;text-align:right;">¥${fmtMoney(ag.cost)}</td>
               <td style="padding:9px 12px;border:1px solid #f0f1f3;text-align:right;">¥${fmtMoney(ag.sales)}</td>
-              <td style="padding:9px 12px;border:1px solid #f0f1f3;text-align:right;font-weight:600;color:${acosColorHex(agAcos)};">${agAcos}%</td>
+              <td style="padding:9px 12px;border:1px solid #f0f1f3;text-align:right;font-weight:600;color:${acosColorHex(agAcos)};">${agAcos.toFixed(2)}%</td>
             </tr>`;
           }).join('')}
         </tbody>
-      </table>
+      </table>` : `
+      <div class="empty-state">暂无广告组明细数据（可能当前日期范围无数据或该活动下无广告组）</div>
+      `}
     `;
 
-    document.getElementById('detailModal').classList.add('show');
-
-    // 等 DOM 渲染完再绘图
-    requestAnimationFrame(() => drawDetailChart(campaign));
+    // 等DOM渲染完再绘图
+    requestAnimationFrame(() => drawDetailChart(campaignData));
   } catch (e) {
-    alert('加载详情失败: ' + e.message);
+    document.getElementById('modalBody').innerHTML =
+      `<div class="empty-state">❌ 加载失败: ${e.message}<br><button class="btn btn-secondary" onclick="openDetail('${campaignId}')" style="margin-top:10px;">重试</button></div>`;
   }
 }
 
@@ -926,7 +1106,7 @@ async function syncData() {
     });
     const json = await res.json();
     if (json.success) {
-      alert('✅ 同步完成，正在刷新…');
+      alert('✅ 元数据同步完成（店铺/产品/广告组合/活动列表已更新）。报告数据将在查询时实时获取。');
       loadPortfolios();
     } else {
       alert('❌ 同步失败: ' + json.message);
