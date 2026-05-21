@@ -159,15 +159,24 @@ async function sendChatRequest({ apiKey, baseUrl, model, messages, tools, toolCh
 
   try {
     // 第一次：带 tools 尝试
-    return await doRequest(true);
+    const result = await doRequest(true);
+
+    // ⚠️ 如果返回了 tool_use 相关的错误（模型不支持 function calling），自动降级重试
+    if (!result.success && result.error && /tool|function.?call|endpoint|support/i.test(result.error) && tools && tools.length) {
+      console.warn(`[AI Service] 模型不支持工具调用（${result.error.slice(0, 100)}），降级为普通对话...`);
+      const fallback = await doRequest(false);
+      return { ...fallback, toolsFallback: true, warning: '当前模型不支持工具调用，已降级为普通对话模式' };
+    }
+
+    return result;
   } catch (err) {
     const status = err.response?.status;
     const errMsg = err.response?.data?.error?.message || err.message || '请求失败';
 
     // 如果是 500 且带了 tools，自动降级：不带 tools 重试
     // 通常原因：免费 Key 不支持 Function Calling / 模型不支持 tools
-    if (status === 500 && tools && tools.length) {
-      console.warn('[AI Service] tools 调用返回 500，降级为普通对话（不传 tools）...');
+    if ((status === 500 || status === 400) && tools && tools.length) {
+      console.warn('[AI Service] tools 调用返回 ' + status + '，降级为普通对话（不传 tools）...');
       try {
         const fallback = await doRequest(false);
         return { ...fallback, toolsFallback: true };

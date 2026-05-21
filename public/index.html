@@ -1318,7 +1318,7 @@
       return div.innerHTML;
     }
 
-    // ========== 加载数据 ==========
+    // ========== 加载数据（分层策略：实时优先 + 本地兜底） ==========
     async function loadDashboardData() {
       try {
         // 测试领星连接状态
@@ -1337,44 +1337,95 @@
           document.getElementById('dataSourceLabel').textContent = '领星未连接';
         }
 
-        // 获取报告数据 - 从领星同步数据（overview接口），支持按店铺筛选
-        try {
-          const params = new URLSearchParams();
-          if (currentStoreId) params.set('storeId', currentStoreId);
-          const overviewRes = await fetch(`${API_BASE}/lingxing/overview?${params}`);
-          const overviewData = await overviewRes.json();
-          
-          if (overviewData.success && overviewData.data) {
-            const data = overviewData.data;
-            // 字段映射：后端返回 totalCost/totalSales/acos/campaignCount
-            const cost = data.totalCost || data.cost || 0;
-            const sales = data.totalSales || data.sales || 0;
-            const acos = data.acos || 0;
-            const campaigns = data.campaignCount || data.campaigns || 0;
-            
-            document.getElementById('totalSpend').textContent = `¥${cost.toLocaleString()}`;
-            document.getElementById('totalSales').textContent = `¥${sales.toLocaleString()}`;
-            document.getElementById('totalAcos').textContent = `${acos.toFixed(1)}%`;
-            document.getElementById('totalCampaigns').textContent = campaigns;
+        // ── 核心指标：实时从领星拉取报告数据（优先），本地overview兜底 ──
+        const today = new Date();
+        const endDate   = today.toISOString().slice(0, 10);
+        const startD    = new Date(today - 7 * 86400000);
+        const startDate = startD.toISOString().slice(0, 10);
 
-            // TACOS 计算（如果有自然销售数据）
-            const naturalSales = data.naturalSales || 0;
-            const totalSalesAll = sales + naturalSales;
-            if (totalSalesAll > 0) {
-              const tacos = (cost / totalSalesAll) * 100;
-              document.getElementById('totalTacos').textContent = `${tacos.toFixed(2)}%`;
-              const verdict = tacos <= 5 ? '极优秀' : tacos <= 10 ? '优秀' : tacos <= 20 ? '良好' : tacos <= 30 ? '需优化' : '严重超标';
-              const color = tacos <= 5 ? 'var(--success)' : tacos <= 20 ? 'var(--warning)' : 'var(--danger)';
-              document.getElementById('tacosStatus').textContent = verdict;
-              document.getElementById('tacosStatus').style.color = color;
+        let hasRealtimeData = false;
+
+        // 尝试从领星实时获取报告数据（需要先有店铺ID）
+        if (currentStoreId) {
+          try {
+            const reportRes = await fetch(`${API_BASE}/lingxing/reports`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sid: currentStoreId,
+                startDate,
+                endDate,
+                type: 'campaign'
+              })
+            });
+            const reportJson = await reportRes.json();
+
+            if (reportJson.success && reportJson.summary) {
+              const s = reportJson.summary;
+              const cost  = parseFloat(s.cost?.toFixed(2)) || 0;
+              const sales = parseFloat(s.sales?.toFixed(2)) || 0;
+
+              document.getElementById('totalSpend').textContent     = `¥${cost.toLocaleString()}`;
+              document.getElementById('totalSales').textContent    = `¥${sales.toLocaleString()}`;
+              document.getElementById('totalAcos').textContent     = `${parseFloat(s.acos || 0).toFixed(1)}%`;
+              document.getElementById('totalCampaigns').textContent = reportJson.queryInfo?.recordCount || reportJson.data.length || 0;
+
+              // TACOS
+              if (sales > 0) {
+                const tacos = (cost / sales) * 100;
+                document.getElementById('totalTacos').textContent = `${tacos.toFixed(2)}%`;
+                const verdict = tacos <= 5 ? '极优秀' : tacos <= 10 ? '优秀' : tacos <= 20 ? '良好' : tacos <= 30 ? '需优化' : '严重超标';
+                const color   = tacos <= 5 ? 'var(--success)' : tacos <= 20 ? 'var(--warning)' : 'var(--danger)';
+                document.getElementById('tacosStatus').textContent = verdict;
+                document.getElementById('tacosStatus').style.color = color;
+              }
+
+              document.getElementById('dataSourceLabel').textContent = '✓ 领星 ERP（实时）';
+              hasRealtimeData = true;
+              console.log('[Dashboard] 实时报告数据加载成功');
             }
-            
-            // 更新数据源标签
-            document.getElementById('dataSourceLabel').textContent = '✓ 领星 ERP';
-            document.getElementById('dataSourceLabel').style.color = 'var(--success)';
+          } catch (e) {
+            console.warn('[Dashboard] 实时报告获取失败，回退到本地缓存:', e.message);
           }
-        } catch (e) {
-          console.log('领星overview数据获取失败，使用默认值');
+        }
+
+        // 兜底：如果实时数据获取失败或没有选店铺，用本地overview数据
+        if (!hasRealtimeData) {
+          try {
+            const params = new URLSearchParams();
+            if (currentStoreId) params.set('storeId', currentStoreId);
+            const overviewRes = await fetch(`${API_BASE}/lingxing/overview?${params}`);
+            const overviewData = await overviewRes.json();
+            
+            if (overviewData.success && overviewData.data) {
+              const data = overviewData.data;
+              const cost      = data.totalCost || data.cost || 0;
+              const sales     = data.totalSales || data.sales || 0;
+              const acos      = data.acos || 0;
+              const campaigns = data.campaignCount || data.campaigns || 0;
+              
+              document.getElementById('totalSpend').textContent     = `¥${cost.toLocaleString()}`;
+              document.getElementById('totalSales').textContent    = `¥${sales.toLocaleString()}`;
+              document.getElementById('totalAcos').textContent     = `${acos.toFixed(1)}%`;
+              document.getElementById('totalCampaigns').textContent = campaigns;
+
+              const naturalSales = data.naturalSales || 0;
+              const totalSalesAll = sales + naturalSales;
+              if (totalSalesAll > 0) {
+                const tacos = (cost / totalSalesAll) * 100;
+                document.getElementById('totalTacos').textContent = `${tacos.toFixed(2)}%`;
+                const verdict = tacos <= 5 ? '极优秀' : tacos <= 10 ? '优秀' : tacos <= 20 ? '良好' : tacos <= 30 ? '需优化' : '严重超标';
+                const color   = tacos <= 5 ? 'var(--success)' : tacos <= 20 ? 'var(--warning)' : 'var(--danger)';
+                document.getElementById('tacosStatus').textContent = verdict;
+                document.getElementById('tacosStatus').style.color = color;
+              }
+              
+              document.getElementById('dataSourceLabel').textContent = hasRealtimeData ? '✓ 领星 ERP（实时）' : '✓ 领星 ERP（缓存）';
+              document.getElementById('dataSourceLabel').style.color = 'var(--success)';
+            }
+          } catch (e) {
+            console.log('领星overview数据获取失败，使用默认值');
+          }
         }
 
         // 获取建议
